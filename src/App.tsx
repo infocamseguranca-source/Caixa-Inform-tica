@@ -859,56 +859,8 @@ export default function App() {
     );
   }
 
-  // Login Screen
-  if (needsAuth || !user) {
-    return (
-      <div className="min-h-screen bg-zinc-50/50 flex flex-col items-center justify-center p-6 font-sans">
-        <motion.div 
-          initial={{ opacity: 0, y: 15 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-white p-8 rounded-3xl border border-zinc-100 shadow-xl max-w-md w-full text-center space-y-6"
-        >
-          <div className="mx-auto w-16 h-16 bg-zinc-900 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-zinc-900/10">
-            <Computer size={32} />
-          </div>
-
-          <div className="space-y-2">
-            <h1 className="text-2xl font-black text-zinc-950 tracking-tight">Controle de Caixa</h1>
-            <p className="text-xs text-zinc-400">Gestão, Vendas e Ordens de Serviço para Assistência Técnica</p>
-          </div>
-
-          <div className="bg-zinc-50 border border-zinc-150 p-4 rounded-xl text-left space-y-2">
-            <div className="flex gap-2 text-zinc-600 font-bold text-xs">
-              <Database size={16} className="text-zinc-500 shrink-0 mt-0.5" />
-              <span>Banco de Dados Firestore Ativo</span>
-            </div>
-            <p className="text-[11px] text-zinc-400">Todos os seus registros de fluxo de caixa, estoque, equipe, ordens de serviço e agendamentos estarão sincronizados de maneira segura.</p>
-          </div>
-
-          <div className="pt-2">
-            <button
-              onClick={handleGoogleSignIn}
-              disabled={isLoggingIn}
-              className="gsi-material-button w-full flex items-center justify-center gap-3.5 px-5 py-3.5 border border-zinc-200 hover:bg-zinc-50 bg-white rounded-xl text-xs font-bold tracking-tight text-zinc-700 transition-all cursor-pointer shadow-xs"
-            >
-              <div className="gsi-material-button-icon">
-                <svg version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" style={{ display: 'block', width: '20px', height: '20px' }}>
-                  <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"></path>
-                  <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"></path>
-                  <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"></path>
-                  <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"></path>
-                  <path fill="none" d="M0 0h48v48H0z"></path>
-                </svg>
-              </div>
-              <span className="gsi-material-button-contents">Entrar com conta Google</span>
-            </button>
-          </div>
-
-          <p className="text-[10px] text-zinc-400">Ao entrar, você concede permissão para o aplicativo realizar backups diretamente na sua conta Google Drive de forma automática.</p>
-        </motion.div>
-      </div>
-    );
-  }
+  // No blocking login screen on startup. Allow fully offline/local use by default.
+  // The user can authenticate when they visit the "Drive & Backup" tab or via the sidebar.
 
   // Active custom palette from settings
   const primaryThemeColor = shopConfig.colors?.primary || '#18181b';
@@ -1022,25 +974,39 @@ export default function App() {
 
           <div className="flex items-center gap-3 bg-zinc-50 p-2.5 rounded-xl border border-zinc-150">
             <div className="w-8 h-8 rounded-full bg-zinc-200 flex items-center justify-center font-bold text-zinc-600 overflow-hidden text-xs shrink-0 border border-zinc-200">
-              {user.photoURL ? (
+              {user?.photoURL ? (
                 <img src={user.photoURL} alt={user.displayName || 'User'} referrerPolicy="no-referrer" />
               ) : (
-                user.displayName?.substring(0, 2) || <User />
+                user?.displayName?.substring(0, 2) || <User size={14} />
               )}
             </div>
             {isHovered && (
               <motion.div 
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                className="min-w-0"
+                className="min-w-0 flex-1"
               >
-                <p className="text-[11px] font-extrabold text-zinc-900 truncate">{user.displayName || 'Usuário'}</p>
-                <button 
-                  onClick={handleSignOut}
-                  className="text-[9px] font-bold text-rose-500 hover:text-rose-600 hover:underline flex items-center gap-0.5 cursor-pointer mt-0.5"
-                >
-                  <LogOut size={9} /> Sair
-                </button>
+                {user ? (
+                  <>
+                    <p className="text-[11px] font-extrabold text-zinc-900 truncate">{user.displayName || 'Usuário'}</p>
+                    <button 
+                      onClick={handleSignOut}
+                      className="text-[9px] font-bold text-rose-500 hover:text-rose-600 hover:underline flex items-center gap-0.5 cursor-pointer mt-0.5"
+                    >
+                      <LogOut size={9} /> Sair
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-[11px] font-bold text-zinc-400 truncate">Modo Local</p>
+                    <button 
+                      onClick={handleGoogleSignIn}
+                      className="text-[9px] font-extrabold text-zinc-900 hover:underline flex items-center gap-0.5 cursor-pointer mt-0.5"
+                    >
+                      Conectar Google
+                    </button>
+                  </>
+                )}
               </motion.div>
             )}
           </div>
@@ -1132,20 +1098,34 @@ export default function App() {
 
                 <div className="flex items-center gap-3 bg-zinc-50 p-3 rounded-xl border border-zinc-150">
                   <div className="w-8 h-8 rounded-full bg-zinc-200 flex items-center justify-center font-bold text-zinc-600 overflow-hidden text-xs shrink-0">
-                    {user.photoURL ? (
+                    {user?.photoURL ? (
                       <img src={user.photoURL} alt={user.displayName || 'User'} referrerPolicy="no-referrer" />
                     ) : (
-                      user.displayName?.substring(0, 2) || <User />
+                      user?.displayName?.substring(0, 2) || <User size={14} />
                     )}
                   </div>
                   <div>
-                    <p className="text-xs font-bold text-zinc-900">{user.displayName || 'Usuário'}</p>
-                    <button 
-                      onClick={handleSignOut}
-                      className="text-[10px] font-bold text-rose-500 flex items-center gap-0.5 cursor-pointer mt-0.5"
-                    >
-                      <LogOut size={10} /> Sair
-                    </button>
+                    {user ? (
+                      <>
+                        <p className="text-xs font-bold text-zinc-900">{user.displayName || 'Usuário'}</p>
+                        <button 
+                          onClick={handleSignOut}
+                          className="text-[10px] font-bold text-rose-500 flex items-center gap-0.5 cursor-pointer mt-0.5"
+                        >
+                          <LogOut size={10} /> Sair
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-xs font-bold text-zinc-500">Modo Local</p>
+                        <button 
+                          onClick={handleGoogleSignIn}
+                          className="text-[10px] font-bold text-zinc-900 flex items-center gap-0.5 cursor-pointer mt-0.5"
+                        >
+                          Conectar Google
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
