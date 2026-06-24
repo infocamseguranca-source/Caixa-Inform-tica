@@ -29,11 +29,12 @@ import {
 import { ServiceOrder, OSStatus, PartOrder } from '../types';
 import { formatCurrency, formatDate, generateOSNumber, formatPhone } from '../utils';
 import { motion, AnimatePresence } from 'motion/react';
+import { jsPDF } from 'jspdf';
 
 interface ServiceOrdersProps {
   serviceOrders: ServiceOrder[];
-  onAddOS: (os: Omit<ServiceOrder, 'id' | 'osNumber' | 'createdAt' | 'updatedAt'>) => Promise<void>;
-  onEditOS: (id: string, os: Partial<ServiceOrder>) => Promise<void>;
+  onAddOS: (os: Omit<ServiceOrder, 'id' | 'osNumber' | 'createdAt' | 'updatedAt'>) => Promise<ServiceOrder>;
+  onEditOS: (id: string, os: Partial<ServiceOrder>) => Promise<ServiceOrder>;
   onDeleteOS: (id: string) => Promise<void>;
   onReceivePayment: (os: ServiceOrder, paymentMethod: 'dinheiro' | 'pix' | 'debito' | 'credito') => Promise<void>;
   shopName?: string;
@@ -41,6 +42,8 @@ interface ServiceOrdersProps {
   shopCnpjCpf?: string;
   shopEmail?: string;
   shopLogo?: string;
+  autoSaveOSToDrive?: boolean;
+  googleToken?: string | null;
 }
 
 const STATUS_OPTIONS: { value: OSStatus; label: string; colorClass: string; bgClass: string; borderClass: string }[] = [
@@ -71,7 +74,9 @@ export default function ServiceOrders({
   shopPhone,
   shopCnpjCpf,
   shopEmail,
-  shopLogo
+  shopLogo,
+  autoSaveOSToDrive,
+  googleToken
 }: ServiceOrdersProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState<'todas' | OSStatus>('todas');
@@ -117,6 +122,215 @@ export default function ServiceOrders({
   const [partCostPrice, setPartCostPrice] = useState('0');
   const [partClientPrice, setPartClientPrice] = useState('0');
   const [partSupplierLink, setPartSupplierLink] = useState('');
+
+  // Automatically generate and upload OS PDF to Google Drive under folder "InfoCam_OS_PDFs"
+  const generateAndUploadOSPDF = async (os: ServiceOrder) => {
+    if (!googleToken || !autoSaveOSToDrive) return;
+
+    try {
+      console.log('Starting automated PDF generation and upload for O.S. #', os.osNumber);
+
+      // 1. Create a beautiful A4 PDF using jsPDF
+      const doc = new jsPDF({
+        orientation: 'p',
+        unit: 'mm',
+        format: 'a4'
+      });
+
+      // Simple elegant black and white high-contrast header styling for standard business receipt
+      doc.setFont('Helvetica', 'bold');
+      doc.setFontSize(16);
+      doc.text(shopName || 'INFO_CAM ASSISTENCIA TECNICA', 14, 20);
+
+      doc.setFontSize(9);
+      doc.setFont('Helvetica', 'normal');
+      doc.text(`Contato: ${shopPhone || ''} | CNPJ/CPF: ${shopCnpjCpf || ''}`, 14, 26);
+      doc.text(`Email: ${shopEmail || ''}`, 14, 31);
+
+      doc.setFont('Helvetica', 'bold');
+      doc.setFontSize(14);
+      doc.text(`O.S. NUMERO: ${os.osNumber}`, 130, 20);
+      doc.setFontSize(9);
+      doc.setFont('Helvetica', 'normal');
+      doc.text(`Abertura: ${formatDate(os.createdAt)}`, 130, 26);
+      doc.text(`Status: ${os.status.toUpperCase()}`, 130, 31);
+
+      doc.setDrawColor(220, 220, 224);
+      doc.line(14, 35, 196, 35);
+
+      // Customer section
+      doc.setFont('Helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.text('DADOS DO CLIENTE', 14, 42);
+      doc.setFont('Helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.text(`Nome: ${os.customerName}`, 14, 48);
+      doc.text(`Telefone: ${formatPhone(os.customerPhone)}`, 14, 53);
+      doc.text(`Email: ${os.customerEmail || 'Não cadastrado'}`, 14, 58);
+
+      // Equipment section
+      doc.setFont('Helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.text('DADOS DO APARELHO', 110, 42);
+      doc.setFont('Helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.text(`Equipamento: ${os.deviceName}`, 110, 48);
+      doc.text(`Tipo: ${os.deviceType || 'N/A'}`, 110, 53);
+      doc.text(`N/S Série: ${os.serialNumber || 'N/A'}`, 110, 58);
+
+      doc.line(14, 64, 196, 64);
+
+      // Technical descriptions
+      doc.setFont('Helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.text('DEFEITO RECLAMADO', 14, 71);
+      doc.setFont('Helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.text(os.reportedDefect || 'Sem informações.', 14, 77, { maxWidth: 180 });
+
+      doc.setFont('Helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.text('LAUDO E DIAGNOSTICO TECNICO', 14, 93);
+      doc.setFont('Helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.text(os.technicalDiagnosis || 'Aguardando diagnóstico do técnico.', 14, 99, { maxWidth: 180 });
+
+      doc.line(14, 115, 196, 115);
+
+      // Pricing & details
+      doc.setFont('Helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.text('RESUMO DE VALORES E FATURAMENTO', 14, 122);
+      doc.setFont('Helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.text(`Mão de Obra / Serviços: ${formatCurrency(os.priceLabor)}`, 14, 128);
+      doc.text(`Materiais / Peças de Reposição: ${formatCurrency(os.priceParts)}`, 14, 133);
+      
+      doc.setFont('Helvetica', 'bold');
+      doc.setFontSize(11);
+      doc.text(`VALOR TOTAL: ${formatCurrency(os.totalAmount)}`, 14, 142);
+      doc.text(`SITUACAO FINANCEIRA: ${os.paymentStatus === 'pago' ? 'RECEBIDO / PAGO' : 'PAGAMENTO PENDENTE'}`, 110, 142);
+
+      doc.line(14, 150, 196, 150);
+
+      // Observations
+      if (os.deviceObservations) {
+        doc.setFont('Helvetica', 'bold');
+        doc.setFontSize(9);
+        doc.text('OBSERVACOES INTERNAS:', 14, 156);
+        doc.setFont('Helvetica', 'normal');
+        doc.text(os.deviceObservations, 14, 161, { maxWidth: 180 });
+        doc.line(14, 172, 196, 172);
+      }
+
+      // Legal disclaimer terms
+      doc.setFont('Helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.text('1. Os serviços prestados possuem garantia legal de 90 dias a contar da entrega do aparelho.', 14, 180);
+      doc.text('2. Aparelhos não retirados em até 90 dias após a notificação de finalização estarão sujeitos a venda para custeio do reparo.', 14, 184);
+
+      // Signature lines
+      doc.setDrawColor(180, 180, 180);
+      doc.line(30, 215, 90, 215);
+      doc.text('Assinatura do Técnico', 45, 219);
+
+      doc.line(120, 215, 180, 215);
+      doc.text('Assinatura do Cliente', 135, 219);
+
+      // Generate the raw PDF Blob
+      const pdfBlob = doc.output('blob');
+
+      // 2. Query for directory folder named "InfoCam_OS_PDFs"
+      const folderQueryResponse = await fetch(
+        `https://www.googleapis.com/drive/v3/files?q=name='InfoCam_OS_PDFs'+and+mimeType='application/vnd.google-apps.folder'+and+trashed=false`,
+        {
+          headers: {
+            'Authorization': `Bearer ${googleToken}`
+          }
+        }
+      );
+
+      let folderId = '';
+      if (folderQueryResponse.ok) {
+        const folderQueryData = await folderQueryResponse.json();
+        if (folderQueryData.files && folderQueryData.files.length > 0) {
+          folderId = folderQueryData.files[0].id;
+        }
+      }
+
+      // Create folder if it doesn't exist
+      if (!folderId) {
+        const createFolderResponse = await fetch('https://www.googleapis.com/drive/v3/files', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${googleToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            name: 'InfoCam_OS_PDFs',
+            mimeType: 'application/vnd.google-apps.folder',
+            description: 'Pasta para salvamento automático das ordens de serviço geradas'
+          })
+        });
+
+        if (createFolderResponse.ok) {
+          const createFolderData = await createFolderResponse.json();
+          folderId = createFolderData.id;
+        }
+      }
+
+      // 3. Upload raw Blob directly as base64 multipart form
+      const cleanCustomerName = os.customerName.replace(/[^a-zA-Z0-9]/g, '_');
+      const fileName = `OS_${os.osNumber}_${cleanCustomerName}.pdf`;
+      const metadata = {
+        name: fileName,
+        mimeType: 'application/pdf',
+        parents: folderId ? [folderId] : []
+      };
+
+      const boundary = 'os_pdf_boundary_999';
+      const delimiter = `\r\n--${boundary}\r\n`;
+      const closeDelim = `\r\n--${boundary}--`;
+
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const base64Data = reader.result?.toString().split(',')[1];
+        if (!base64Data) return;
+
+        const metadataPart = delimiter +
+          'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
+          JSON.stringify(metadata);
+
+        const mediaPart = delimiter +
+          'Content-Type: application/pdf\r\n' +
+          'Content-Transfer-Encoding: base64\r\n\r\n' +
+          base64Data +
+          closeDelim;
+
+        const multipartBody = metadataPart + mediaPart;
+
+        const uploadResponse = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${googleToken}`,
+            'Content-Type': `multipart/related; boundary=${boundary}`
+          },
+          body: multipartBody
+        });
+
+        if (uploadResponse.ok) {
+          console.log(`[Google Drive] PDF da O.S. ${os.osNumber} salvo com sucesso!`);
+        } else {
+          console.error('[Google Drive] Erro ao enviar PDF:', await uploadResponse.text());
+        }
+      };
+
+      reader.readAsDataURL(pdfBlob);
+
+    } catch (err) {
+      console.error('[Google Drive] Falha geral no auto-save:', err);
+    }
+  };
 
   // Setup/Reset drawing pad canvas
   useEffect(() => {
@@ -294,8 +508,9 @@ export default function ServiceOrders({
     }
 
     try {
+      let savedOS: ServiceOrder | null = null;
       if (editingOS) {
-        await onEditOS(editingOS.id, {
+        savedOS = await onEditOS(editingOS.id, {
           customerName,
           customerPhone,
           customerEmail,
@@ -317,7 +532,7 @@ export default function ServiceOrders({
           partOrder
         });
       } else {
-        await onAddOS({
+        savedOS = await onAddOS({
           customerName,
           customerPhone,
           customerEmail,
@@ -340,6 +555,10 @@ export default function ServiceOrders({
         });
       }
       setIsModalOpen(false);
+      
+      if (savedOS && autoSaveOSToDrive && googleToken) {
+        generateAndUploadOSPDF(savedOS);
+      }
     } catch (err) {
       console.error(err);
       alert('Erro ao salvar Ordem de Serviço.');

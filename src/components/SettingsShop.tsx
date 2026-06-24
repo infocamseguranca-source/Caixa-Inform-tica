@@ -69,6 +69,7 @@ export default function SettingsShop({
   const [osStartNumber, setOsStartNumber] = useState<number>(config.osStartNumber || 1001);
   const [categories, setCategories] = useState<string[]>(config.categories || DEFAULT_CATEGORIES);
   const [menuOrder, setMenuOrder] = useState<string[]>(config.menuOrder || AVAILABLE_MENUS.map(m => m.id));
+  const [autoSaveOSToDrive, setAutoSaveOSToDrive] = useState<boolean>(config.autoSaveOSToDrive || false);
 
   // Staff fields
   const [staffName, setStaffName] = useState('');
@@ -99,7 +100,8 @@ export default function SettingsShop({
         phone,
         email,
         logo,
-        osStartNumber
+        osStartNumber,
+        autoSaveOSToDrive
       });
       alert('Configurações da loja salvas com sucesso!');
     } catch (err) {
@@ -330,6 +332,26 @@ export default function SettingsShop({
                   placeholder="Ex: 1001"
                 />
                 <p className="text-[10px] text-zinc-400 mt-1">O sistema gerará a próxima ordem de serviço a partir deste número sequencial para manter seu histórico.</p>
+              </div>
+            </div>
+
+            <div className="border-t border-zinc-100 pt-4">
+              <div className="flex items-start justify-between p-4 bg-zinc-50 border border-zinc-200/60 rounded-2xl">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-zinc-900 block">Salvar PDF no Google Drive</label>
+                  <span className="text-[10px] text-zinc-500 block max-w-xl">Ao habilitar, toda nova Ordem de Serviço gerará um PDF automatizado que será salvo na pasta do programa no seu Google Drive (caso esteja conectado na aba Backup).</span>
+                </div>
+                <div className="relative inline-flex items-center cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    id="auto-save-drive-toggle"
+                    checked={autoSaveOSToDrive} 
+                    onChange={(e) => setAutoSaveOSToDrive(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <label htmlFor="auto-save-drive-toggle" className="sr-only">Habilitar backup automático de O.S. no Drive</label>
+                  <div className="w-9 h-5 bg-zinc-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-zinc-950"></div>
+                </div>
               </div>
             </div>
 

@@ -102,6 +102,7 @@ export interface ShopConfig {
   categories: string[];
   osStartNumber: number;
   menuOrder: string[]; // List of tab IDs
+  autoSaveOSToDrive?: boolean;
 }
 
 export interface CashRegisterState {

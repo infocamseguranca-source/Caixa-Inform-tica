@@ -178,7 +178,8 @@ const DEFAULT_CONFIG: ShopConfig = {
     'Outros'
   ],
   osStartNumber: 1001,
-  menuOrder: ['dashboard', 'caixa', 'vendas', 'produtos', 'os', 'agendamentos', 'backup', 'settings_shop']
+  menuOrder: ['dashboard', 'caixa', 'vendas', 'produtos', 'os', 'agendamentos', 'backup', 'settings_shop'],
+  autoSaveOSToDrive: false
 };
 
 export default function App() {
@@ -217,14 +218,14 @@ export default function App() {
         try {
           const accessToken = await getAccessToken();
           setToken(accessToken);
-          setNeedsAuth(!accessToken);
+          setNeedsAuth(false); // Do not force login block, allow hybrid use
         } catch (error) {
           console.error('Error getting auth token:', error);
-          setNeedsAuth(true);
+          setNeedsAuth(false);
         }
       } else {
         setToken(null);
-        setNeedsAuth(true);
+        setNeedsAuth(false); // Completely offline by default
       }
       setLoading(false);
     });
@@ -232,16 +233,64 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // Set up real-time listeners for authenticated users
+  // Set up real-time listeners or load from localStorage
   useEffect(() => {
     if (!user) {
-      setTransactions([]);
-      setServiceOrders([]);
-      setBackupHistory([]);
-      setProducts([]);
-      setStaffList([]);
-      setAppointments([]);
-      setShopConfig(DEFAULT_CONFIG);
+      // Offline Mode: Load from localStorage
+      const localTx = localStorage.getItem('infocam_transactions');
+      const localOS = localStorage.getItem('infocam_service_orders');
+      const localBackup = localStorage.getItem('infocam_backup_history');
+      const localProducts = localStorage.getItem('infocam_products');
+      const localStaff = localStorage.getItem('infocam_staff');
+      const localAppts = localStorage.getItem('infocam_appointments');
+      const localConfig = localStorage.getItem('infocam_config');
+
+      if (localTx) {
+        setTransactions(JSON.parse(localTx));
+      } else {
+        setTransactions(SAMPLE_TRANSACTIONS.map((t, i) => ({ id: `tx-${i}-${Date.now()}`, ...t })));
+      }
+
+      if (localOS) {
+        setServiceOrders(JSON.parse(localOS));
+      } else {
+        setServiceOrders(SAMPLE_SERVICE_ORDERS.map((o, i) => ({ 
+          id: `os-${i}-${Date.now()}`, 
+          ...o,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        })));
+      }
+
+      if (localBackup) {
+        setBackupHistory(JSON.parse(localBackup));
+      } else {
+        setBackupHistory([]);
+      }
+
+      if (localProducts) {
+        setProducts(JSON.parse(localProducts));
+      } else {
+        setProducts(SAMPLE_PRODUCTS.map((p, i) => ({ id: `p-${i}`, ...p })));
+      }
+
+      if (localStaff) {
+        setStaffList(JSON.parse(localStaff));
+      } else {
+        setStaffList(SAMPLE_STAFF.map((s, i) => ({ id: `s-${i}`, ...s })));
+      }
+
+      if (localAppts) {
+        setAppointments(JSON.parse(localAppts));
+      } else {
+        setAppointments([]);
+      }
+
+      if (localConfig) {
+        setShopConfig(JSON.parse(localConfig));
+      } else {
+        setShopConfig(DEFAULT_CONFIG);
+      }
       return;
     }
 
@@ -345,11 +394,47 @@ export default function App() {
       await logout();
       setUser(null);
       setToken(null);
-      setNeedsAuth(true);
+      setNeedsAuth(false); // Do not force login on logout
     } catch (err) {
       console.error('Erro ao deslogar:', err);
     }
   };
+
+  // Persistent caching to localStorage for seamless offline access and updates
+  useEffect(() => {
+    if (loading) return;
+    localStorage.setItem('infocam_transactions', JSON.stringify(transactions));
+  }, [transactions, loading]);
+
+  useEffect(() => {
+    if (loading) return;
+    localStorage.setItem('infocam_service_orders', JSON.stringify(serviceOrders));
+  }, [serviceOrders, loading]);
+
+  useEffect(() => {
+    if (loading) return;
+    localStorage.setItem('infocam_backup_history', JSON.stringify(backupHistory));
+  }, [backupHistory, loading]);
+
+  useEffect(() => {
+    if (loading) return;
+    localStorage.setItem('infocam_products', JSON.stringify(products));
+  }, [products, loading]);
+
+  useEffect(() => {
+    if (loading) return;
+    localStorage.setItem('infocam_staff', JSON.stringify(staffList));
+  }, [staffList, loading]);
+
+  useEffect(() => {
+    if (loading) return;
+    localStorage.setItem('infocam_appointments', JSON.stringify(appointments));
+  }, [appointments, loading]);
+
+  useEffect(() => {
+    if (loading) return;
+    localStorage.setItem('infocam_config', JSON.stringify(shopConfig));
+  }, [shopConfig, loading]);
 
   // Seeding sample template data
   const handleSeedSamples = async () => {
@@ -486,126 +571,198 @@ export default function App() {
 
   // CRUD Transaction Operations
   const handleAddTransaction = async (item: Omit<Transaction, 'id'>) => {
-    if (!user) return;
-    await addDoc(collection(db, 'transactions'), item);
+    if (user) {
+      await addDoc(collection(db, 'transactions'), item);
+    } else {
+      const newTx: Transaction = { id: `tx-${Date.now()}`, ...item };
+      setTransactions(prev => [newTx, ...prev]);
+    }
   };
 
   const handleEditTransaction = async (id: string, updatedFields: Partial<Transaction>) => {
-    if (!user) return;
-    await updateDoc(doc(db, 'transactions', id), updatedFields);
+    if (user) {
+      await updateDoc(doc(db, 'transactions', id), updatedFields);
+    } else {
+      setTransactions(prev => prev.map(t => t.id === id ? { ...t, ...updatedFields } : t));
+    }
   };
 
   const handleDeleteTransaction = async (id: string) => {
-    if (!user) return;
-    await deleteDoc(doc(db, 'transactions', id));
+    if (user) {
+      await deleteDoc(doc(db, 'transactions', id));
+    } else {
+      setTransactions(prev => prev.filter(t => t.id !== id));
+    }
   };
 
   // CRUD OS Operations
-  const handleAddOS = async (item: Omit<ServiceOrder, 'id' | 'osNumber' | 'createdAt' | 'updatedAt'>) => {
-    if (!user) return;
+  const handleAddOS = async (item: Omit<ServiceOrder, 'id' | 'osNumber' | 'createdAt' | 'updatedAt'>): Promise<ServiceOrder> => {
     const osNumber = generateOSNumber();
-    await addDoc(collection(db, 'service_orders'), {
+    const osPayload = {
       ...item,
       osNumber,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
-    });
+    };
+    if (user) {
+      const docRef = await addDoc(collection(db, 'service_orders'), osPayload);
+      return { id: docRef.id, ...osPayload };
+    } else {
+      const id = `os-${Date.now()}`;
+      const newOS: ServiceOrder = { id, ...osPayload };
+      setServiceOrders(prev => [newOS, ...prev]);
+      return newOS;
+    }
   };
 
-  const handleEditOS = async (id: string, updatedFields: Partial<ServiceOrder>) => {
-    if (!user) return;
-    await updateDoc(doc(db, 'service_orders', id), {
-      ...updatedFields,
-      updatedAt: new Date().toISOString()
-    });
+  const handleEditOS = async (id: string, updatedFields: Partial<ServiceOrder>): Promise<ServiceOrder> => {
+    const now = new Date().toISOString();
+    if (user) {
+      await updateDoc(doc(db, 'service_orders', id), {
+        ...updatedFields,
+        updatedAt: now
+      });
+      const existing = serviceOrders.find(o => o.id === id);
+      return { ...existing, ...updatedFields, id, updatedAt: now } as ServiceOrder;
+    } else {
+      let updatedOS: ServiceOrder | null = null;
+      setServiceOrders(prev => prev.map(os => {
+        if (os.id === id) {
+          updatedOS = { ...os, ...updatedFields, updatedAt: now };
+          return updatedOS;
+        }
+        return os;
+      }));
+      return updatedOS || ({ ...updatedFields, id, updatedAt: now } as ServiceOrder);
+    }
   };
 
   const handleDeleteOS = async (id: string) => {
-    if (!user) return;
-    await deleteDoc(doc(db, 'service_orders', id));
+    if (user) {
+      await deleteDoc(doc(db, 'service_orders', id));
+    } else {
+      setServiceOrders(prev => prev.filter(os => os.id !== id));
+    }
   };
 
   // CRUD Product Operations
   const handleAddProduct = async (item: Omit<Product, 'id'>) => {
-    if (!user) return;
-    await addDoc(collection(db, 'products'), item);
+    if (user) {
+      await addDoc(collection(db, 'products'), item);
+    } else {
+      const newProd: Product = { id: `p-${Date.now()}`, ...item };
+      setProducts(prev => [newProd, ...prev]);
+    }
   };
 
   const handleEditProduct = async (id: string, updatedFields: Partial<Product>) => {
-    if (!user) return;
-    await updateDoc(doc(db, 'products', id), updatedFields);
+    if (user) {
+      await updateDoc(doc(db, 'products', id), updatedFields);
+    } else {
+      setProducts(prev => prev.map(p => p.id === id ? { ...p, ...updatedFields } : p));
+    }
   };
 
   const handleDeleteProduct = async (id: string) => {
-    if (!user) return;
-    await deleteDoc(doc(db, 'products', id));
+    if (user) {
+      await deleteDoc(doc(db, 'products', id));
+    } else {
+      setProducts(prev => prev.filter(p => p.id !== id));
+    }
   };
 
   // CRUD Staff Operations
   const handleAddStaff = async (item: Omit<Staff, 'id'>) => {
-    if (!user) return;
-    await addDoc(collection(db, 'staff'), item);
+    if (user) {
+      await addDoc(collection(db, 'staff'), item);
+    } else {
+      const newStaff: Staff = { id: `s-${Date.now()}`, ...item };
+      setStaffList(prev => [newStaff, ...prev]);
+    }
   };
 
   const handleDeleteStaff = async (id: string) => {
-    if (!user) return;
-    await deleteDoc(doc(db, 'staff', id));
+    if (user) {
+      await deleteDoc(doc(db, 'staff', id));
+    } else {
+      setStaffList(prev => prev.filter(s => s.id !== id));
+    }
   };
 
   // CRUD Appointment Operations
   const handleAddAppointment = async (item: Omit<Appointment, 'id' | 'notified'>) => {
-    if (!user) return;
-    await addDoc(collection(db, 'appointments'), {
-      ...item,
-      notified: false
-    });
+    const payload = { ...item, notified: false };
+    if (user) {
+      await addDoc(collection(db, 'appointments'), payload);
+    } else {
+      const newAppt: Appointment = { id: `appt-${Date.now()}`, ...payload };
+      setAppointments(prev => [newAppt, ...prev]);
+    }
   };
 
   const handleDeleteAppointment = async (id: string) => {
-    if (!user) return;
-    await deleteDoc(doc(db, 'appointments', id));
+    if (user) {
+      await deleteDoc(doc(db, 'appointments', id));
+    } else {
+      setAppointments(prev => prev.filter(app => app.id !== id));
+    }
   };
 
   // Save Shop Configuration
   const handleSaveShopConfig = async (updatedConfig: ShopConfig) => {
-    if (!user) return;
-    await setDoc(doc(db, 'shop_config', 'config'), updatedConfig);
+    if (user) {
+      await setDoc(doc(db, 'shop_config', 'config'), updatedConfig);
+    } else {
+      localStorage.setItem('infocam_config', JSON.stringify(updatedConfig));
+    }
     setShopConfig(updatedConfig);
   };
 
   // INTEGRATED RECEIVING FLOW: OS paid and cash register synchronized
   const handleReceiveOSPayment = async (os: ServiceOrder, paymentMethod: 'dinheiro' | 'pix' | 'debito' | 'credito') => {
-    if (!user) return;
-    try {
-      // 1. Create cash transaction
-      const transactionPayload: Omit<Transaction, 'id'> = {
-        description: `Recebimento O.S. ${os.osNumber} - Cliente: ${os.customerName}`,
-        amount: os.totalAmount,
-        type: 'entrada',
-        category: 'Serviço de Assistência',
-        paymentMethod,
-        date: new Date().toISOString(),
-        osId: os.id
-      };
-      await addDoc(collection(db, 'transactions'), transactionPayload);
+    const transactionPayload: Omit<Transaction, 'id'> = {
+      description: `Recebimento O.S. ${os.osNumber} - Cliente: ${os.customerName}`,
+      amount: os.totalAmount,
+      type: 'entrada',
+      category: 'Serviço de Assistência',
+      paymentMethod,
+      date: new Date().toISOString(),
+      osId: os.id
+    };
 
-      // 2. Mark OS as delivered and paid
-      await updateDoc(doc(db, 'service_orders', os.id), {
+    if (user) {
+      try {
+        await addDoc(collection(db, 'transactions'), transactionPayload);
+        await updateDoc(doc(db, 'service_orders', os.id), {
+          status: 'entregue',
+          paymentStatus: 'pago',
+          updatedAt: new Date().toISOString()
+        });
+        alert(`Pagamento de ${os.osNumber} recebido com sucesso no Caixa!`);
+      } catch (err) {
+        console.error(err);
+        throw err;
+      }
+    } else {
+      const newTx: Transaction = { id: `tx-${Date.now()}`, ...transactionPayload };
+      setTransactions(prev => [newTx, ...prev]);
+      setServiceOrders(prev => prev.map(item => item.id === os.id ? {
+        ...item,
         status: 'entregue',
         paymentStatus: 'pago',
         updatedAt: new Date().toISOString()
-      });
-
-      alert(`Pagamento de ${os.osNumber} recebido com sucesso no Caixa!`);
-    } catch (err) {
-      console.error(err);
-      throw err;
+      } : item));
+      alert(`Pagamento de ${os.osNumber} recebido com sucesso no Caixa Local!`);
     }
   };
 
   const handleAddBackupLog = async (log: Omit<BackupHistory, 'id'>) => {
-    if (!user) return;
-    await addDoc(collection(db, 'backup_history'), log);
+    if (user) {
+      await addDoc(collection(db, 'backup_history'), log);
+    } else {
+      const newLog: BackupHistory = { id: `bk-${Date.now()}`, ...log };
+      setBackupHistory(prev => [newLog, ...prev]);
+    }
   };
 
   // PDV sale registration logic that decreases product stock automatically
@@ -616,37 +773,44 @@ export default function App() {
     paymentMethod: 'dinheiro' | 'pix' | 'debito' | 'credito';
     total: number;
   }) => {
-    if (!user) return;
-    try {
-      const batch = writeBatch(db);
-      
-      // 1. Create a cash transaction
-      const desc = `Venda PDV - ${saleData.items.map(i => `${i.qty}x ${i.product.name}`).join(', ')}`;
-      const transactionPayload = {
-        description: desc.substring(0, 150) + (desc.length > 150 ? '...' : ''),
-        amount: saleData.total,
-        type: 'entrada',
-        category: 'Venda de Equipamento',
-        paymentMethod: saleData.paymentMethod,
-        date: new Date().toISOString(),
-        sellerId: saleData.sellerId || null,
-        technicianId: saleData.technicianId || null
-      };
-      
-      const transRef = doc(collection(db, 'transactions'));
-      batch.set(transRef, transactionPayload);
-      
-      // 2. Decrement stock for each product in the sale
-      saleData.items.forEach(item => {
-        const prodRef = doc(db, 'products', item.product.id);
-        const newStock = Math.max(0, item.product.stock - item.qty);
-        batch.update(prodRef, { stock: newStock });
-      });
-      
-      await batch.commit();
-    } catch (err) {
-      console.error('Erro ao processar venda no PDV:', err);
-      throw err;
+    const desc = `Venda PDV - ${saleData.items.map(i => `${i.qty}x ${i.product.name}`).join(', ')}`;
+    const transactionPayload = {
+      description: desc.substring(0, 150) + (desc.length > 150 ? '...' : ''),
+      amount: saleData.total,
+      type: 'entrada' as const,
+      category: 'Venda de Equipamento',
+      paymentMethod: saleData.paymentMethod,
+      date: new Date().toISOString(),
+      sellerId: saleData.sellerId || null,
+      technicianId: saleData.technicianId || null
+    };
+
+    if (user) {
+      try {
+        const batch = writeBatch(db);
+        const transRef = doc(collection(db, 'transactions'));
+        batch.set(transRef, transactionPayload);
+        saleData.items.forEach(item => {
+          const prodRef = doc(db, 'products', item.product.id);
+          const newStock = Math.max(0, item.product.stock - item.qty);
+          batch.update(prodRef, { stock: newStock });
+        });
+        await batch.commit();
+      } catch (err) {
+        console.error('Erro ao processar venda no PDV:', err);
+        throw err;
+      }
+    } else {
+      const newTx: Transaction = { id: `tx-${Date.now()}`, ...transactionPayload };
+      setTransactions(prev => [newTx, ...prev]);
+      setProducts(prev => prev.map(p => {
+        const saleItem = saleData.items.find(item => item.product.id === p.id);
+        if (saleItem) {
+          return { ...p, stock: Math.max(0, p.stock - saleItem.qty) };
+        }
+        return p;
+      }));
+      alert('Venda registrada localmente com sucesso!');
     }
   };
 
@@ -1068,6 +1232,8 @@ export default function App() {
                 shopCnpjCpf={shopConfig.cnpjCpf}
                 shopEmail={shopConfig.email}
                 shopLogo={shopConfig.logo}
+                autoSaveOSToDrive={shopConfig.autoSaveOSToDrive}
+                googleToken={token}
               />
             )}
 
