@@ -1,0 +1,6 @@
+{
+  "name": "Controle de Caixa",
+  "description": "Controle de fluxo de caixa para lojas de informática com integração Firebase e backup automático no Google Drive.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

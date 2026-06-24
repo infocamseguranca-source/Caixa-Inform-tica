@@ -1,0 +1,21 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    match /transactions/{transactionId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    match /service_orders/{osId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    match /backup_history/{backupId} {
+      allow read, write: if isAuthenticated();
+    }
+  }
+}
