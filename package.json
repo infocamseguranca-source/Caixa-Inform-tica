@@ -1,14 +1,18 @@
 {
-  "name": "react-example",
+  "name": "infocam-controle-caixa",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
+  "main": "electron-main.cjs",
   "scripts": {
     "dev": "vite --port=3000 --host=0.0.0.0",
     "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "electron:start": "electron .",
+    "electron:dev": "concurrently \"vite --port=3000\" \"electron .\"",
+    "electron:build": "vite build && electron-builder"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
@@ -27,10 +31,26 @@
     "@types/express": "^4.17.21",
     "@types/node": "^22.14.0",
     "autoprefixer": "^10.4.21",
+    "concurrently": "^8.2.2",
+    "electron": "^29.1.0",
+    "electron-builder": "^24.13.3",
     "esbuild": "^0.25.0",
     "tailwindcss": "^4.1.14",
     "tsx": "^4.21.0",
-    "typescript": "~5.8.2",
-    "vite": "^6.2.3"
+    "typescript": "~5.8.2"
+  },
+  "build": {
+    "appId": "com.infocam.controlecaixa",
+    "productName": "InfoCam Controle de Caixa",
+    "files": [
+      "dist/**/*",
+      "electron-main.cjs",
+      "preload.cjs",
+      "package.json"
+    ],
+    "win": {
+      "target": "portable",
+      "icon": "public/computer.png"
+    }
   }
 }

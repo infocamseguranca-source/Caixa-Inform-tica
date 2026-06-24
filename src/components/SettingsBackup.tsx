@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   Cloud, 
   CloudLightning, 
@@ -12,7 +12,8 @@ import {
   HelpCircle,
   User,
   LogOut,
-  Clock
+  Clock,
+  Laptop
 } from 'lucide-react';
 import { Transaction, ServiceOrder, BackupHistory } from '../types';
 import { formatDate } from '../utils';
@@ -50,6 +51,62 @@ export default function SettingsBackup({
   const [restoring, setRestoring] = useState(false);
   const [backupMessage, setBackupMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [isElectron, setIsElectron] = useState(false);
+  const [electronBackupPath, setElectronBackupPath] = useState<string | null>(null);
+
+  useEffect(() => {
+    const hasElectron = typeof window !== 'undefined' && (window as any).electronAPI !== undefined;
+    setIsElectron(hasElectron);
+
+    if (hasElectron) {
+      const api = (window as any).electronAPI;
+      const unsubscribe = api.onBackupStatus((status: { success: boolean; path?: string; fileName?: string; error?: string }) => {
+        if (status.success) {
+          setElectronBackupPath(status.path || null);
+          setBackupMessage({
+            type: 'success',
+            text: `Backup local automático salvo em: ${status.path}`
+          });
+        } else {
+          setBackupMessage({
+            type: 'error',
+            text: `Erro no backup local: ${status.error}`
+          });
+        }
+      });
+
+      // Periodic automatic backup every 10 minutes when transactions or orders exist
+      const interval = setInterval(() => {
+        triggerElectronBackup();
+      }, 10 * 60 * 1000);
+
+      // Trigger once on load
+      const timeout = setTimeout(() => {
+        triggerElectronBackup();
+      }, 3000);
+
+      return () => {
+        unsubscribe();
+        clearInterval(interval);
+        clearTimeout(timeout);
+      };
+    }
+  }, [transactions.length, serviceOrders.length]);
+
+  const triggerElectronBackup = () => {
+    const hasElectron = typeof window !== 'undefined' && (window as any).electronAPI !== undefined;
+    if (hasElectron) {
+      const backupPayload = {
+        app: "Controle de Caixa - Assistência Técnica",
+        version: "1.0.0",
+        backupDate: new Date().toISOString(),
+        transactions,
+        serviceOrders
+      };
+      (window as any).electronAPI.saveLocalBackup(backupPayload);
+    }
+  };
 
   // Manual trigger to backup on Google Drive
   const handleDriveBackup = async () => {
@@ -319,19 +376,33 @@ export default function SettingsBackup({
       {/* Backup and Restore Actions */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         
-        {/* Cloud backup */}
+        {/* Cloud/Desktop backup */}
         <div className="bg-white p-6 rounded-2xl border border-zinc-100 space-y-4">
           <div className="flex items-center gap-3">
             <div className="p-3 bg-blue-50 text-blue-600 rounded-xl">
-              <Cloud size={24} />
+              {isElectron ? <Laptop size={24} /> : <Cloud size={24} />}
             </div>
             <div>
-              <h3 className="text-base font-bold text-zinc-950 font-sans">Gerar Novo Backup</h3>
-              <p className="text-xs text-zinc-400">Salve as tabelas atuais e ordens de serviço</p>
+              <h3 className="text-base font-bold text-zinc-950 font-sans">
+                {isElectron ? 'Backup do Sistema (.exe)' : 'Gerar Novo Backup'}
+              </h3>
+              <p className="text-xs text-zinc-400">
+                {isElectron ? 'Backup local automático na sua máquina' : 'Salve as tabelas atuais e ordens de serviço'}
+              </p>
             </div>
           </div>
 
-          <p className="text-xs text-zinc-500">Ao clicar, geramos um arquivo compactado `.json` e enviamos diretamente ao seu Google Drive, mantendo uma trilha protegida.</p>
+          {isElectron ? (
+            <div className="p-3.5 bg-zinc-50 border border-zinc-200 rounded-xl text-xs space-y-1 text-zinc-600">
+              <p className="font-semibold text-zinc-800">📁 Pasta de Backups:</p>
+              <p className="font-mono text-[10px] break-all text-zinc-500 bg-white p-2 rounded border border-zinc-100">
+                Este Computador \ Documentos \ Backup_InfoCam
+              </p>
+              <p className="text-[10px] text-zinc-400 mt-1">O programa salva um backup nesta pasta automaticamente a cada 10 minutos para garantir total resiliência!</p>
+            </div>
+          ) : (
+            <p className="text-xs text-zinc-500">Ao clicar, geramos um arquivo compactado `.json` e enviamos diretamente ao seu Google Drive, mantendo uma trilha protegida.</p>
+          )}
 
           {backupMessage && (
             <div className={`p-3.5 rounded-xl border flex gap-2.5 text-xs font-medium ${backupMessage.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-rose-50 border-rose-200 text-rose-700'}`}>
@@ -340,22 +411,34 @@ export default function SettingsBackup({
             </div>
           )}
 
-          <div className="flex gap-2 pt-2">
-            <button
-              onClick={handleDriveBackup}
-              disabled={backingUp || !token}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-zinc-900 hover:bg-zinc-800 text-white rounded-xl text-xs font-bold disabled:opacity-40 transition-all cursor-pointer"
-            >
-              <RefreshCw size={14} className={backingUp ? 'animate-spin' : ''} />
-              {backingUp ? 'Enviando ao Drive...' : 'Fazer Backup no Drive'}
-            </button>
-            <button
-              onClick={handleLocalExport}
-              className="px-4 py-3 bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border border-zinc-200 rounded-xl text-xs font-bold cursor-pointer"
-              title="Baixar arquivo JSON localmente"
-            >
-              <Download size={14} />
-            </button>
+          <div className="flex flex-col gap-2 pt-2">
+            {isElectron && (
+              <button
+                onClick={triggerElectronBackup}
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all cursor-pointer"
+              >
+                <RefreshCw size={14} />
+                Forçar Backup Local Agora
+              </button>
+            )}
+
+            <div className="flex gap-2 w-full">
+              <button
+                onClick={handleDriveBackup}
+                disabled={backingUp || !token}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-zinc-900 hover:bg-zinc-800 text-white rounded-xl text-xs font-bold disabled:opacity-40 transition-all cursor-pointer"
+              >
+                <Cloud size={14} className={backingUp ? 'animate-spin' : ''} />
+                {backingUp ? 'Enviando ao Drive...' : 'Salvar no Google Drive'}
+              </button>
+              <button
+                onClick={handleLocalExport}
+                className="px-4 py-3 bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border border-zinc-200 rounded-xl text-xs font-bold cursor-pointer"
+                title="Baixar arquivo JSON localmente"
+              >
+                <Download size={14} />
+              </button>
+            </div>
           </div>
         </div>
 
