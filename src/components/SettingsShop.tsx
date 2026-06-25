@@ -13,10 +13,15 @@ import {
   Sparkles,
   Percent,
   TrendingUp,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Shield,
+  Lock,
+  Key,
+  FileText,
+  Printer
 } from 'lucide-react';
-import { ShopConfig, Staff } from '../types';
-import { motion } from 'motion/react';
+import { ShopConfig, Staff, Transaction, ServiceOrder } from '../types';
+import { motion, AnimatePresence } from 'motion/react';
 
 interface SettingsShopProps {
   config: ShopConfig;
@@ -24,6 +29,8 @@ interface SettingsShopProps {
   staffList: Staff[];
   onAddStaff: (staff: Omit<Staff, 'id'>) => Promise<void>;
   onDeleteStaff: (id: string) => Promise<void>;
+  transactions: Transaction[];
+  serviceOrders: ServiceOrder[];
 }
 
 const DEFAULT_CATEGORIES = [
@@ -54,9 +61,11 @@ export default function SettingsShop({
   onSaveConfig,
   staffList,
   onAddStaff,
-  onDeleteStaff
+  onDeleteStaff,
+  transactions,
+  serviceOrders
 }: SettingsShopProps) {
-  const [activeSubTab, setActiveSubTab] = useState<'geral' | 'cores' | 'equipe' | 'categorias' | 'menus'>('geral');
+  const [activeSubTab, setActiveSubTab] = useState<'geral' | 'cores' | 'equipe' | 'categorias' | 'menus' | 'avancado' | 'impressoras'>('geral');
   
   // Shop Config fields
   const [name, setName] = useState(config.name || '');
@@ -70,6 +79,36 @@ export default function SettingsShop({
   const [categories, setCategories] = useState<string[]>(config.categories || DEFAULT_CATEGORIES);
   const [menuOrder, setMenuOrder] = useState<string[]>(config.menuOrder || AVAILABLE_MENUS.map(m => m.id));
   const [autoSaveOSToDrive, setAutoSaveOSToDrive] = useState<boolean>(config.autoSaveOSToDrive || false);
+
+  // Printer settings
+  const [nonFiscalPrinterType, setNonFiscalPrinterType] = useState<'none' | 'bluetooth' | 'usb' | 'network'>(config.nonFiscalPrinterType || 'none');
+  const [nonFiscalPrinterName, setNonFiscalPrinterName] = useState(config.nonFiscalPrinterName || '');
+  const [commonPrinterType, setCommonPrinterType] = useState<'none' | 'system' | 'network'>(config.commonPrinterType || 'none');
+  const [commonPrinterName, setCommonPrinterName] = useState(config.commonPrinterName || '');
+
+  // App Options / Advanced Configs
+  const [commissionPassword, setCommissionPassword] = useState(config.commissionPassword || '');
+  const [finalizationOptions, setFinalizationOptions] = useState<string[]>(
+    config.finalizationOptions || ['Pronto para Retirada', 'Retirado Sem Reparo', 'Devolvido ao Cliente']
+  );
+  const [purchaseCategories, setPurchaseCategories] = useState<string[]>(
+    config.purchaseCategories || ['Informatica', 'Celulares']
+  );
+  const [purchaseEquipmentTypes, setPurchaseEquipmentTypes] = useState<string[]>(
+    config.purchaseEquipmentTypes || ['Computador', 'Notebook', 'Celular', 'Tablet', 'Monitor', 'Impressora', 'Outros']
+  );
+  const [enablePurchaseSignature, setEnablePurchaseSignature] = useState<boolean>(
+    config.enablePurchaseSignature ?? true
+  );
+
+  // Advanced sub inputs
+  const [newFinOption, setNewFinOption] = useState('');
+  const [newPurCategory, setNewPurCategory] = useState('');
+  const [newPurEquipType, setNewPurEquipType] = useState('');
+
+  // Password Modal for commissions download
+  const [isPassModalOpen, setIsPassModalOpen] = useState(false);
+  const [promptPasswordInput, setPromptPasswordInput] = useState('');
 
   // Staff fields
   const [staffName, setStaffName] = useState('');
@@ -108,6 +147,100 @@ export default function SettingsShop({
       console.error(err);
       alert('Erro ao salvar as configurações.');
     }
+  };
+
+  const handleSaveAdvanced = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    try {
+      await onSaveConfig({
+        ...config,
+        commissionPassword,
+        finalizationOptions,
+        purchaseCategories,
+        purchaseEquipmentTypes,
+        enablePurchaseSignature
+      });
+      alert('Configurações salvas com sucesso!');
+    } catch (err) {
+      console.error(err);
+      alert('Erro ao salvar configurações.');
+    }
+  };
+
+  const handleSavePrinters = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    try {
+      await onSaveConfig({
+        ...config,
+        nonFiscalPrinterType,
+        nonFiscalPrinterName,
+        commonPrinterType,
+        commonPrinterName
+      });
+      alert('Configurações de impressora salvas com sucesso!');
+    } catch (err) {
+      console.error(err);
+      alert('Erro ao salvar as configurações de impressora.');
+    }
+  };
+
+  const handleExportCommissions = () => {
+    if (!config.commissionPassword) {
+      alert('Atenção: Cadastre uma senha para download de comissões na aba "Opções do App" antes de continuar.');
+      return;
+    }
+    setIsPassModalOpen(true);
+    setPromptPasswordInput('');
+  };
+
+  const verifyPasswordAndDownload = () => {
+    if (promptPasswordInput !== config.commissionPassword) {
+      alert('Senha incorreta! Acesso negado.');
+      return;
+    }
+    setIsPassModalOpen(false);
+
+    // Build report rows
+    const rows = [
+      ['Colaborador', 'Cargo', 'Total de Vendas/Servicos (R$)', 'Comissao Devida (R$)']
+    ];
+
+    staffList.forEach(st => {
+      let totalSalesOrServices = 0;
+      let totalCommission = 0;
+
+      if (st.role === 'vendedor') {
+        const sellerTxs = transactions.filter(t => t.sellerId === st.id && t.type === 'entrada');
+        const sumTxs = sellerTxs.reduce((sum, t) => sum + t.amount, 0);
+        totalSalesOrServices = sumTxs;
+        totalCommission = sumTxs * (st.commission / 100);
+      } else if (st.role === 'tecnico') {
+        // Complete/Paid Service Orders
+        const techOSs = serviceOrders.filter(os => os.technicianId === st.id && os.status === 'entregue');
+        const sumLabor = techOSs.reduce((sum, os) => sum + (os.priceLabor || 0), 0);
+        totalSalesOrServices = sumLabor;
+        totalCommission = sumLabor * (st.commission / 100);
+      }
+
+      rows.push([
+        st.name,
+        st.role === 'tecnico' ? 'Tecnico' : 'Vendedor',
+        totalSalesOrServices.toFixed(2),
+        totalCommission.toFixed(2)
+      ]);
+    });
+
+    const csvContent = "data:text/csv;charset=utf-8,\uFEFF" 
+      + rows.map(e => e.map(val => `"${val.toString().replace(/"/g, '""')}"`).join(",")).join("\n");
+    
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `comissoes_vendedores_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    alert('Relatório de comissões baixado com sucesso!');
   };
 
   const handleSaveColors = async () => {
@@ -224,6 +357,18 @@ export default function SettingsShop({
           className={`py-2 px-4 text-xs font-bold whitespace-nowrap border-b-2 cursor-pointer transition-all ${activeSubTab === 'menus' ? 'border-zinc-950 text-zinc-950 font-extrabold' : 'border-transparent text-zinc-400 hover:text-zinc-600'}`}
         >
           <ListOrdered className="inline-block mr-1.5" size={14} /> Ordem dos Menus
+        </button>
+        <button
+          onClick={() => setActiveSubTab('impressoras')}
+          className={`py-2 px-4 text-xs font-bold whitespace-nowrap border-b-2 cursor-pointer transition-all ${activeSubTab === 'impressoras' ? 'border-zinc-950 text-zinc-950 font-extrabold' : 'border-transparent text-zinc-400 hover:text-zinc-600'}`}
+        >
+          <Printer className="inline-block mr-1.5" size={14} /> Impressoras
+        </button>
+        <button
+          onClick={() => setActiveSubTab('avancado')}
+          className={`py-2 px-4 text-xs font-bold whitespace-nowrap border-b-2 cursor-pointer transition-all ${activeSubTab === 'avancado' ? 'border-zinc-950 text-zinc-950 font-extrabold' : 'border-transparent text-zinc-400 hover:text-zinc-600'}`}
+        >
+          <Settings className="inline-block mr-1.5" size={14} /> Opções do App
         </button>
       </div>
 
@@ -490,10 +635,9 @@ export default function SettingsShop({
             </form>
 
             <div className="border border-zinc-100 rounded-xl overflow-hidden divide-y divide-zinc-100">
-              <div className="grid grid-cols-3 bg-zinc-50 py-2.5 px-4 text-xs font-extrabold text-zinc-400 uppercase tracking-wider">
+              <div className="grid grid-cols-2 bg-zinc-50 py-2.5 px-4 text-xs font-extrabold text-zinc-400 uppercase tracking-wider">
                 <span>Colaborador</span>
-                <span>Função</span>
-                <span className="text-center">Ações / Comissões</span>
+                <span className="text-right">Função / Ações</span>
               </div>
               
               {staffList.length === 0 ? (
@@ -502,18 +646,16 @@ export default function SettingsShop({
                 </div>
               ) : (
                 staffList.map((st) => (
-                  <div key={st.id} className="grid grid-cols-3 py-3 px-4 items-center bg-white text-xs text-zinc-800 hover:bg-zinc-50/50">
-                    <span className="font-bold">{st.name}</span>
-                    <span className="capitalize text-zinc-500">
-                      {st.role === 'tecnico' ? '⚙️ Técnico' : '🛒 Vendedor'}
-                    </span>
-                    <div className="flex items-center justify-between pl-4">
-                      <span className="font-bold text-zinc-900 bg-zinc-50 border border-zinc-150 py-0.5 px-2.5 rounded-full inline-flex items-center gap-0.5">
-                        <Percent size={10} /> {st.commission}%
+                  <div key={st.id} className="grid grid-cols-2 py-3 px-4 items-center bg-white text-xs text-zinc-800 hover:bg-zinc-50/50">
+                    <span className="font-bold text-zinc-900">{st.name}</span>
+                    <div className="flex items-center justify-end gap-4">
+                      <span className="capitalize text-zinc-500 bg-zinc-100 px-2 py-0.5 rounded-md text-[10px] font-semibold">
+                        {st.role === 'tecnico' ? '⚙️ Técnico' : '🛒 Vendedor'}
                       </span>
                       <button
                         onClick={() => onDeleteStaff(st.id)}
                         className="p-1 hover:bg-rose-50 text-zinc-400 hover:text-rose-600 rounded-lg transition-colors cursor-pointer"
+                        title="Remover Colaborador"
                       >
                         <Trash2 size={14} />
                       </button>
@@ -521,6 +663,23 @@ export default function SettingsShop({
                   </div>
                 ))
               )}
+            </div>
+
+            {/* Secure Download Commissions Section */}
+            <div className="bg-zinc-50 border border-zinc-150 rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-3 mt-4">
+              <div>
+                <h4 className="text-xs font-bold text-zinc-900 flex items-center gap-1.5">
+                  <Shield size={14} className="text-zinc-600" /> Relatório Consolidado de Comissões
+                </h4>
+                <p className="text-[10px] text-zinc-500 mt-1">Este download é protegido por senha de segurança. Contém os totais devidos de comissões calculadas por colaborador.</p>
+              </div>
+              <button
+                type="button"
+                onClick={handleExportCommissions}
+                className="px-4 py-2 bg-zinc-950 hover:bg-zinc-800 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-all shrink-0 shadow-sm"
+              >
+                <FileSpreadsheet size={14} /> Baixar Comissões (Excel/CSV)
+              </button>
             </div>
           </div>
         )}
@@ -595,7 +754,335 @@ export default function SettingsShop({
             </div>
           </div>
         )}
+
+        {activeSubTab === 'avancado' && (
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-sm font-bold text-zinc-900 border-b border-zinc-100 pb-2">Opções Gerais do Aplicativo</h3>
+              <p className="text-xs text-zinc-400">Gerencie a segurança das comissões, opções de finalização de O.S. e as configurações do menu de compras de aparelhos.</p>
+            </div>
+
+            {/* Commission Password */}
+            <div className="bg-zinc-50 p-4 border border-zinc-150 rounded-2xl space-y-3">
+              <h4 className="text-xs font-extrabold text-zinc-700 uppercase tracking-wider flex items-center gap-1.5">
+                <Lock size={14} className="text-zinc-500" /> Senha para Exportação de Comissões
+              </h4>
+              <p className="text-[10px] text-zinc-400">Crie ou altere a senha exigida para baixar o relatório financeiro de comissões. Sem essa senha, ninguém poderá acessar ou baixar os dados de comissão dos técnicos e vendedores.</p>
+              <div className="flex gap-2 max-w-sm">
+                <input
+                  type="text"
+                  placeholder="Defina uma senha segura..."
+                  value={commissionPassword}
+                  onChange={(e) => setCommissionPassword(e.target.value)}
+                  className="w-full px-3 py-1.5 border border-zinc-200 rounded-xl text-xs bg-white"
+                />
+              </div>
+            </div>
+
+            {/* OS Finalization Options */}
+            <div className="bg-zinc-50 p-4 border border-zinc-150 rounded-2xl space-y-3">
+              <h4 className="text-xs font-extrabold text-zinc-700 uppercase tracking-wider flex items-center gap-1.5">
+                <Check size={14} className="text-zinc-500" /> Opções de Status para Finalização de O.S.
+              </h4>
+              <p className="text-[10px] text-zinc-400">Defina as opções de desfecho ao encerrar uma ordem de serviço. O sistema solicitará uma observação caso escolha opções sem reparo ou devolução.</p>
+              
+              <div className="flex gap-2 max-w-md">
+                <input
+                  type="text"
+                  placeholder="Ex: Sem conserto / Sucata"
+                  value={newFinOption}
+                  onChange={(e) => setNewFinOption(e.target.value)}
+                  className="flex-1 px-3 py-1.5 border border-zinc-200 rounded-xl text-xs bg-white"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (newFinOption.trim()) {
+                      setFinalizationOptions([...finalizationOptions, newFinOption.trim()]);
+                      setNewFinOption('');
+                    }
+                  }}
+                  className="px-3 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-white rounded-xl text-xs font-bold cursor-pointer"
+                >
+                  Adicionar
+                </button>
+              </div>
+
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {finalizationOptions.map((opt) => (
+                  <span key={opt} className="inline-flex items-center gap-1 py-1 px-2.5 bg-white border border-zinc-150 rounded-lg text-[10px] font-bold text-zinc-700 shadow-2xs">
+                    {opt}
+                    <button
+                      type="button"
+                      onClick={() => setFinalizationOptions(finalizationOptions.filter(f => f !== opt))}
+                      className="text-zinc-400 hover:text-rose-600 font-bold ml-1 text-xs"
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            {/* Equipment Purchases Settings */}
+            <div className="bg-zinc-50 p-4 border border-zinc-150 rounded-2xl space-y-4">
+              <h4 className="text-xs font-extrabold text-zinc-700 uppercase tracking-wider flex items-center gap-1.5">
+                <Store size={14} className="text-zinc-500" /> Parâmetros de Compra de Equipamentos Usados
+              </h4>
+              <p className="text-[10px] text-zinc-400">Configure as opções exibidas quando sua assistência estiver comprando celulares, notebooks ou outros equipamentos de clientes.</p>
+
+              {/* Purchase categories */}
+              <div className="space-y-2">
+                <label className="block text-[11px] font-bold text-zinc-500">Categorias de Compra (Ex: Celulares, Informática)</label>
+                <div className="flex gap-2 max-w-md">
+                  <input
+                    type="text"
+                    placeholder="Nova categoria de compra..."
+                    value={newPurCategory}
+                    onChange={(e) => setNewPurCategory(e.target.value)}
+                    className="flex-1 px-3 py-1.5 border border-zinc-200 rounded-xl text-xs bg-white"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (newPurCategory.trim()) {
+                        setPurchaseCategories([...purchaseCategories, newPurCategory.trim()]);
+                        setNewPurCategory('');
+                      }
+                    }}
+                    className="px-3 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-white rounded-xl text-xs font-bold cursor-pointer"
+                  >
+                    Adicionar
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  {purchaseCategories.map((cat) => (
+                    <span key={cat} className="inline-flex items-center gap-1 py-1 px-2.5 bg-white border border-zinc-150 rounded-lg text-[10px] font-bold text-zinc-700 shadow-2xs">
+                      {cat}
+                      <button
+                        type="button"
+                        onClick={() => setPurchaseCategories(purchaseCategories.filter(c => c !== cat))}
+                        className="text-zinc-400 hover:text-rose-600 font-bold ml-1 text-xs"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              {/* Equipment types */}
+              <div className="space-y-2 pt-2">
+                <label className="block text-[11px] font-bold text-zinc-500">Tipos de Aparelho Disponíveis</label>
+                <div className="flex gap-2 max-w-md">
+                  <input
+                    type="text"
+                    placeholder="Computador, Tablet, Drone..."
+                    value={newPurEquipType}
+                    onChange={(e) => setNewPurEquipType(e.target.value)}
+                    className="flex-1 px-3 py-1.5 border border-zinc-200 rounded-xl text-xs bg-white"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (newPurEquipType.trim()) {
+                        setPurchaseEquipmentTypes([...purchaseEquipmentTypes, newPurEquipType.trim()]);
+                        setNewPurEquipType('');
+                      }
+                    }}
+                    className="px-3 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-white rounded-xl text-xs font-bold cursor-pointer"
+                  >
+                    Adicionar
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  {purchaseEquipmentTypes.map((t) => (
+                    <span key={t} className="inline-flex items-center gap-1 py-1 px-2.5 bg-white border border-zinc-150 rounded-lg text-[10px] font-bold text-zinc-700 shadow-2xs">
+                      {t}
+                      <button
+                        type="button"
+                        onClick={() => setPurchaseEquipmentTypes(purchaseEquipmentTypes.filter(x => x !== t))}
+                        className="text-zinc-400 hover:text-rose-600 font-bold ml-1 text-xs"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              {/* Enable online signature */}
+              <div className="flex items-center gap-2 pt-2">
+                <input
+                  type="checkbox"
+                  id="enableSignature"
+                  checked={enablePurchaseSignature}
+                  onChange={(e) => setEnablePurchaseSignature(e.target.checked)}
+                  className="w-4 h-4 text-zinc-900 border-zinc-300 rounded focus:ring-zinc-900"
+                />
+                <label htmlFor="enableSignature" className="text-xs font-bold text-zinc-700 cursor-pointer select-none">
+                  Habilitar Assinatura Online do Cliente na Tela do Celular / Tablet
+                </label>
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-3">
+              <button
+                type="button"
+                onClick={() => handleSaveAdvanced()}
+                className="px-5 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-white rounded-xl text-xs font-bold cursor-pointer transition-all shadow-sm"
+              >
+                Salvar Opções Avançadas
+              </button>
+            </div>
+          </div>
+        )}
+
+        {activeSubTab === 'impressoras' && (
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-sm font-bold text-zinc-900 border-b border-zinc-100 pb-2">Conexão de Impressoras</h3>
+              <p className="text-xs text-zinc-400">Gerencie a conexão do sistema com impressoras não fiscais (térmicas de recibo) e impressoras comuns (A4).</p>
+            </div>
+
+            {/* Impressora Não Fiscal */}
+            <div className="bg-zinc-50 p-5 border border-zinc-150 rounded-2xl space-y-4">
+              <h4 className="text-xs font-extrabold text-zinc-700 uppercase tracking-wider flex items-center gap-1.5 border-b border-zinc-200 pb-2">
+                <Printer size={16} className="text-emerald-500" /> Impressora Não Fiscal (Térmica de Recibo)
+              </h4>
+              <p className="text-[10px] text-zinc-400">Configure para impressão rápida de comprovantes térmicos de 58mm ou 80mm em atendimentos de balcão e vendas PDV.</p>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-bold text-zinc-500 mb-1">Meio de Conexão</label>
+                  <select
+                    value={nonFiscalPrinterType}
+                    onChange={(e) => setNonFiscalPrinterType(e.target.value as any)}
+                    className="w-full px-3 py-2 border border-zinc-200 rounded-xl text-xs bg-white font-medium focus:outline-none focus:ring-1 focus:ring-zinc-900"
+                  >
+                    <option value="none">Desconectada / Nenhuma</option>
+                    <option value="bluetooth">Bluetooth (Impressora Térmica Portátil)</option>
+                    <option value="usb">USB (via Driver ou WebUSB Direta)</option>
+                    <option value="network">Rede TCP/IP (Ethernet / Wi-Fi)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-zinc-500 mb-1">Identificação / IP / Porta</label>
+                  <input
+                    type="text"
+                    placeholder={nonFiscalPrinterType === 'network' ? 'Ex: 192.168.1.100:9100' : 'Ex: POS-80 ou COM3'}
+                    disabled={nonFiscalPrinterType === 'none'}
+                    value={nonFiscalPrinterName}
+                    onChange={(e) => setNonFiscalPrinterName(e.target.value)}
+                    className="w-full px-3 py-2 border border-zinc-200 rounded-xl text-xs bg-white focus:outline-none focus:ring-1 focus:ring-zinc-900 disabled:opacity-50"
+                  />
+                </div>
+              </div>
+
+              {nonFiscalPrinterType !== 'none' && (
+                <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-xl text-[10px] text-emerald-800 font-medium">
+                  {nonFiscalPrinterType === 'bluetooth' && '✓ Impressora Bluetooth configurada. Garanta que o aparelho de vendas esteja pareado com a impressora térmica.'}
+                  {nonFiscalPrinterType === 'usb' && '✓ Conexão via porta USB configurada. O sistema usará as rotinas de impressão local do navegador.'}
+                  {nonFiscalPrinterType === 'network' && '✓ Impressora de rede configurada. O sistema enviará comandos diretamente para o endereço IP especificado.'}
+                </div>
+              )}
+            </div>
+
+            {/* Impressora Comum */}
+            <div className="bg-zinc-50 p-5 border border-zinc-150 rounded-2xl space-y-4">
+              <h4 className="text-xs font-extrabold text-zinc-700 uppercase tracking-wider flex items-center gap-1.5 border-b border-zinc-200 pb-2">
+                <Printer size={16} className="text-zinc-600" /> Impressora Comum (A4 / Laser / Jato de Tinta)
+              </h4>
+              <p className="text-[10px] text-zinc-400">Configure a impressora padrão para emissão de Contratos de Compra, Ordens de Serviço completas ou Relatórios de Caixa.</p>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-bold text-zinc-500 mb-1">Meio de Conexão</label>
+                  <select
+                    value={commonPrinterType}
+                    onChange={(e) => setCommonPrinterType(e.target.value as any)}
+                    className="w-full px-3 py-2 border border-zinc-200 rounded-xl text-xs bg-white font-medium focus:outline-none focus:ring-1 focus:ring-zinc-900"
+                  >
+                    <option value="none">Desconectada / Nenhuma</option>
+                    <option value="system">Diálogo de Impressão do Sistema (A4 Padrão)</option>
+                    <option value="network">Rede IP (Wi-Fi / Cabeada)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-zinc-500 mb-1">Nome / IP da Impressora</label>
+                  <input
+                    type="text"
+                    placeholder={commonPrinterType === 'network' ? 'Ex: 192.168.1.150' : 'Ex: HP Laserjet Pro'}
+                    disabled={commonPrinterType === 'none'}
+                    value={commonPrinterName}
+                    onChange={(e) => setCommonPrinterName(e.target.value)}
+                    className="w-full px-3 py-2 border border-zinc-200 rounded-xl text-xs bg-white focus:outline-none focus:ring-1 focus:ring-zinc-900 disabled:opacity-50"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-3">
+              <button
+                type="button"
+                onClick={() => handleSavePrinters()}
+                className="px-5 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-white rounded-xl text-xs font-bold cursor-pointer transition-all shadow-sm"
+              >
+                Salvar Configurações de Impressora
+              </button>
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* Password Modal for Secure Downloads */}
+      <AnimatePresence>
+        {isPassModalOpen && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white border border-zinc-150 rounded-2xl max-w-sm w-full p-6 space-y-4 shadow-xl"
+            >
+              <div className="flex items-center gap-2.5 text-zinc-950 font-sans font-bold">
+                <Lock className="text-zinc-600" size={18} />
+                <span>Confirme sua Senha</span>
+              </div>
+              <p className="text-xs text-zinc-500">Insira a senha de download de comissões para baixar o arquivo.</p>
+              
+              <input
+                type="password"
+                placeholder="Digite a senha..."
+                value={promptPasswordInput}
+                onChange={(e) => setPromptPasswordInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && verifyPasswordAndDownload()}
+                className="w-full px-3 py-2 border border-zinc-200 rounded-xl text-sm"
+                autoFocus
+              />
+
+              <div className="flex justify-end gap-2 text-xs font-bold pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsPassModalOpen(false)}
+                  className="px-4 py-2 border border-zinc-200 text-zinc-600 rounded-xl hover:bg-zinc-50 cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={verifyPasswordAndDownload}
+                  className="px-4 py-2 bg-zinc-900 hover:bg-zinc-800 text-white rounded-xl cursor-pointer"
+                >
+                  Confirmar e Baixar
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

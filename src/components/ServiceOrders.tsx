@@ -26,8 +26,9 @@ import {
   QrCode,
   Grid
 } from 'lucide-react';
-import { ServiceOrder, OSStatus, PartOrder } from '../types';
+import { ServiceOrder, OSStatus, PartOrder, ShopConfig, Customer } from '../types';
 import { formatCurrency, formatDate, generateOSNumber, formatPhone } from '../utils';
+import CustomerAutocomplete from './CustomerAutocomplete';
 import { motion, AnimatePresence } from 'motion/react';
 import { jsPDF } from 'jspdf';
 
@@ -44,6 +45,9 @@ interface ServiceOrdersProps {
   shopLogo?: string;
   autoSaveOSToDrive?: boolean;
   googleToken?: string | null;
+  config?: ShopConfig;
+  user: any | null;
+  customers: Customer[];
 }
 
 const STATUS_OPTIONS: { value: OSStatus; label: string; colorClass: string; bgClass: string; borderClass: string }[] = [
@@ -76,11 +80,76 @@ export default function ServiceOrders({
   shopEmail,
   shopLogo,
   autoSaveOSToDrive,
-  googleToken
+  googleToken,
+  config,
+  user,
+  customers
 }: ServiceOrdersProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState<'todas' | OSStatus>('todas');
   
+  // Sorting order ('desc' is newest first, 'asc' is oldest first)
+  const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
+
+  // OS Finalization States
+  const [isFinalizeModalOpen, setIsFinalizeModalOpen] = useState(false);
+  const [finalizingOS, setFinalizingOS] = useState<ServiceOrder | null>(null);
+  const [selectedFinalizationType, setSelectedFinalizationType] = useState('');
+  const [finalizationObservation, setFinalizationObservation] = useState('');
+  const [finalizePaymentMethod, setFinalizePaymentMethod] = useState<'dinheiro' | 'pix' | 'debito' | 'credito'>('pix');
+  const [finalizeMarkAsPaid, setFinalizeMarkAsPaid] = useState(false);
+
+  const handleOpenFinalize = (os: ServiceOrder) => {
+    setFinalizingOS(os);
+    const options = config?.finalizationOptions || ['Pronto para Retirada', 'Retirado Sem Reparo', 'Devolvido ao Cliente'];
+    setSelectedFinalizationType(options[0] || 'Pronto para Retirada');
+    setFinalizationObservation('');
+    setFinalizeMarkAsPaid(os.paymentStatus === 'pago');
+    setIsFinalizeModalOpen(true);
+  };
+
+  const handleSubmitFinalize = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!finalizingOS) return;
+
+    try {
+      const isNoRepair = selectedFinalizationType.toLowerCase().includes('sem reparo') || 
+                          selectedFinalizationType.toLowerCase().includes('devol') || 
+                          selectedFinalizationType.toLowerCase().includes('sem conserto');
+
+      // Append finalization note to technical diagnosis
+      const appendNote = `\n[Finalização: ${selectedFinalizationType}${finalizationObservation ? ` - Obs: ${finalizationObservation}` : ''}]`;
+      const updatedDiagnosis = (finalizingOS.technicalDiagnosis || '') + appendNote;
+
+      const updatedFields: Partial<ServiceOrder> = {
+        status: 'entregue',
+        technicalDiagnosis: updatedDiagnosis,
+        updatedAt: new Date().toISOString()
+      };
+
+      if (finalizeMarkAsPaid && finalizingOS.paymentStatus !== 'pago') {
+        updatedFields.paymentStatus = 'pago';
+        await onReceivePayment(finalizingOS, finalizePaymentMethod);
+      }
+
+      const updatedOS = await onEditOS(finalizingOS.id, updatedFields);
+      
+      setIsFinalizeModalOpen(false);
+      setFinalizingOS(null);
+      
+      try {
+        await generateAndSaveOSPDF(updatedOS);
+      } catch (pdfErr) {
+        console.error('Erro ao gerar/salvar PDF:', pdfErr);
+      }
+      
+      alert('Ordem de Serviço finalizada com sucesso!');
+    } catch (err) {
+      console.error(err);
+      alert('Erro ao finalizar a Ordem de Serviço.');
+    }
+  };
+
   // Modals
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingOS, setEditingOS] = useState<ServiceOrder | null>(null);
@@ -123,12 +192,10 @@ export default function ServiceOrders({
   const [partClientPrice, setPartClientPrice] = useState('0');
   const [partSupplierLink, setPartSupplierLink] = useState('');
 
-  // Automatically generate and upload OS PDF to Google Drive under folder "InfoCam_OS_PDFs"
-  const generateAndUploadOSPDF = async (os: ServiceOrder) => {
-    if (!googleToken || !autoSaveOSToDrive) return;
-
+  // Automatically generate and save/download OS PDF locally, and upload to Google Drive if token available
+  const generateAndSaveOSPDF = async (os: ServiceOrder) => {
     try {
-      console.log('Starting automated PDF generation and upload for O.S. #', os.osNumber);
+      console.log('Starting automated PDF generation and local save for O.S. #', os.osNumber);
 
       // 1. Create a beautiful A4 PDF using jsPDF
       const doc = new jsPDF({
@@ -237,8 +304,17 @@ export default function ServiceOrders({
       doc.line(120, 215, 180, 215);
       doc.text('Assinatura do Cliente', 135, 219);
 
+      // Always save/download PDF locally first
+      const cleanCustomerName = os.customerName.replace(/[^a-zA-Z0-9]/g, '_');
+      doc.save(`OS_${os.osNumber}_${cleanCustomerName}.pdf`);
+
       // Generate the raw PDF Blob
       const pdfBlob = doc.output('blob');
+
+      // If Google Drive integration is not active or set up, don't try to upload
+      if (!googleToken || !autoSaveOSToDrive) {
+        return;
+      }
 
       // 2. Query for directory folder named "InfoCam_OS_PDFs"
       const folderQueryResponse = await fetch(
@@ -280,7 +356,6 @@ export default function ServiceOrders({
       }
 
       // 3. Upload raw Blob directly as base64 multipart form
-      const cleanCustomerName = os.customerName.replace(/[^a-zA-Z0-9]/g, '_');
       const fileName = `OS_${os.osNumber}_${cleanCustomerName}.pdf`;
       const metadata = {
         name: fileName,
@@ -556,8 +631,8 @@ export default function ServiceOrders({
       }
       setIsModalOpen(false);
       
-      if (savedOS && autoSaveOSToDrive && googleToken) {
-        generateAndUploadOSPDF(savedOS);
+      if (savedOS) {
+        generateAndSaveOSPDF(savedOS);
       }
     } catch (err) {
       console.error(err);
@@ -627,7 +702,11 @@ export default function ServiceOrders({
     const matchesTab = activeTab === 'todas' || os.status === activeTab;
 
     return matchesSearch && matchesTab;
-  }).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }).sort((a, b) => {
+    const timeA = new Date(a.createdAt).getTime();
+    const timeB = new Date(b.createdAt).getTime();
+    return sortOrder === 'desc' ? timeB - timeA : timeA - timeB;
+  });
 
   return (
     <div className="space-y-6">
@@ -676,16 +755,44 @@ export default function ServiceOrders({
         })}
       </div>
 
-      {/* Search Input */}
-      <div className="bg-white p-4 rounded-2xl border border-zinc-100 flex items-center relative">
-        <Search className="absolute left-7 top-1/2 -translate-y-1/2 text-zinc-400" size={18} />
-        <input
-          type="text"
-          placeholder="Buscar por número da OS, cliente ou aparelho..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full pl-10 pr-4 py-2 border border-zinc-200 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-zinc-900 bg-zinc-50/50"
-        />
+      {/* Search Input & Controls */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="bg-white p-4 rounded-2xl border border-zinc-150 flex items-center relative flex-1">
+          <Search className="absolute left-7 top-1/2 -translate-y-1/2 text-zinc-400" size={18} />
+          <input
+            type="text"
+            placeholder="Buscar por número da OS, cliente ou aparelho..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 border border-zinc-200 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-zinc-900 bg-zinc-50/50 font-medium"
+          />
+        </div>
+        
+        <div className="flex gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={() => {
+              const num = window.prompt("Digite o número exato da O.S. (Ex: 1005):");
+              if (num && num.trim()) {
+                setSearchTerm(num.trim());
+                setActiveTab('todas');
+              }
+            }}
+            className="px-4 py-2 bg-zinc-900 hover:bg-zinc-800 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+            title="Buscar OS digitando apenas o número"
+          >
+            <Search size={14} /> Buscar O.S. por Nº
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}
+            className="px-4 py-2 bg-white border border-zinc-200 hover:bg-zinc-50 text-zinc-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+            title="Alterar ordenação entre crescente e decrescente"
+          >
+            Organização: {sortOrder === 'desc' ? 'Decrescente ⬇️' : 'Crescente ⬆️'}
+          </button>
+        </div>
       </div>
 
       {/* OS List */}
@@ -694,10 +801,10 @@ export default function ServiceOrders({
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-zinc-50 border-b border-zinc-100 text-xs font-bold text-zinc-400 uppercase tracking-wider">
-                <th className="py-4 px-6">Código OS</th>
-                <th className="py-4 px-4">Cliente / Contato</th>
-                <th className="py-4 px-4">Aparelho / Equipamento</th>
-                <th className="py-4 px-4">Preço Total</th>
+                <th className="py-4 px-6">OS</th>
+                <th className="py-4 px-4">Cliente</th>
+                <th className="py-4 px-4">Equipamento</th>
+                <th className="py-4 px-4">Valor Cobrado</th>
                 <th className="py-4 px-4">Faturamento</th>
                 <th className="py-4 px-4">Status</th>
                 <th className="py-4 px-6 text-center">Ações</th>
@@ -775,6 +882,15 @@ export default function ServiceOrders({
                       {/* Actions */}
                       <td className="py-4 px-6 text-center">
                         <div className="flex items-center justify-center gap-1.5">
+                          {os.status !== 'entregue' && (
+                            <button
+                              onClick={() => handleOpenFinalize(os)}
+                              className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10px] font-black uppercase transition-colors cursor-pointer flex items-center gap-0.5"
+                              title="Finalizar Ordem de Serviço"
+                            >
+                              <Check size={10} /> Finalizar
+                            </button>
+                          )}
                           <button
                             onClick={() => sendWhatsApp(os)}
                             className="p-1.5 hover:bg-emerald-50 text-emerald-600 rounded-lg transition-colors cursor-pointer"
@@ -843,13 +959,18 @@ export default function ServiceOrders({
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="md:col-span-2">
                       <label className="block text-xs font-bold text-zinc-500 mb-1">Nome Completo</label>
-                      <input
-                        type="text"
+                      <CustomerAutocomplete
                         required
                         value={customerName}
-                        onChange={(e) => setCustomerName(e.target.value)}
-                        className="w-full px-3 py-2 border border-zinc-200 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-zinc-900"
-                        placeholder="Ex: João da Silva"
+                        onChange={setCustomerName}
+                        onSelect={(client) => {
+                          setCustomerName(client.name);
+                          if (client.phone) setCustomerPhone(client.phone);
+                          if (client.email) setCustomerEmail(client.email);
+                          if (client.birthDate) setCustomerBirthDate(client.birthDate);
+                        }}
+                        user={user}
+                        customers={customers}
                       />
                     </div>
                     <div>
@@ -1368,6 +1489,16 @@ export default function ServiceOrders({
                     </div>
                   </div>
 
+                  {/* Legal Terms & Warranty */}
+                  <div className="border border-zinc-150 rounded-lg p-2 bg-zinc-50/50 text-[6px] leading-tight text-zinc-500 font-medium">
+                    <p className="font-extrabold text-zinc-700 uppercase mb-0.5">Termos de Garantia & Condições de Atendimento</p>
+                    <ul className="list-disc list-inside space-y-0.5">
+                      <li><strong>Garantia Legal:</strong> Garantia de 90 dias sobre serviços realizados (Art. 26, II do Código de Defesa do Consumidor - Lei 8078/90).</li>
+                      <li><strong>Abandono de Equipamento:</strong> Conforme legislação civil, aparelhos prontos e não retirados após 90 dias serão considerados abandonados, podendo ser alienados pela oficina para custear peças e mão de obra.</li>
+                      <li><strong>Responsabilidade sobre Dados:</strong> Não nos responsabilizamos pela integridade de fotos, contatos, conversas e mídias do aparelho. É dever do cliente efetuar backup completo antes do início do reparo técnico.</li>
+                    </ul>
+                  </div>
+
                   {/* Signatures placeholder */}
                   <div className="grid grid-cols-2 gap-8 pt-4">
                     <div className="border-t border-zinc-300 text-center pt-1 text-[8px] font-bold text-zinc-400 uppercase">
@@ -1439,6 +1570,16 @@ export default function ServiceOrders({
                     </div>
                   </div>
 
+                  {/* Legal Terms & Warranty */}
+                  <div className="border border-zinc-150 rounded-lg p-2 bg-zinc-50/50 text-[6px] leading-tight text-zinc-500 font-medium">
+                    <p className="font-extrabold text-zinc-700 uppercase mb-0.5">Termos de Garantia & Condições de Atendimento</p>
+                    <ul className="list-disc list-inside space-y-0.5">
+                      <li><strong>Garantia Legal:</strong> Garantia de 90 dias sobre serviços realizados (Art. 26, II do Código de Defesa do Consumidor - Lei 8078/90).</li>
+                      <li><strong>Abandono de Equipamento:</strong> Conforme legislação civil, aparelhos prontos e não retirados após 90 dias serão considerados abandonados, podendo ser alienados pela oficina para custear peças e mão de obra.</li>
+                      <li><strong>Responsabilidade sobre Dados:</strong> Não nos responsabilizamos pela integridade de fotos, contatos, conversas e mídias do aparelho. É dever do cliente efetuar backup completo antes do início do reparo técnico.</li>
+                    </ul>
+                  </div>
+
                   {/* Signatures placeholder */}
                   <div className="grid grid-cols-2 gap-8 pt-4">
                     <div className="border-t border-zinc-300 text-center pt-1 text-[8px] font-bold text-zinc-400 uppercase">
@@ -1479,6 +1620,153 @@ export default function ServiceOrders({
           </div>
         )}
       </AnimatePresence>
+
+      {/* FINALIZATION MODAL */}
+      <AnimatePresence>
+        {isFinalizeModalOpen && finalizingOS && (
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white w-full max-w-md rounded-2xl border border-zinc-150 shadow-xl overflow-hidden"
+            >
+              <div className="flex justify-between items-center bg-zinc-50 p-5 border-b border-zinc-100">
+                <h3 className="text-sm font-bold text-zinc-950 font-sans flex items-center gap-2">
+                  <CheckCircle className="text-emerald-600" size={18} />
+                  Finalizar O.S. #{finalizingOS.osNumber}
+                </h3>
+                <button
+                  onClick={() => {
+                    setIsFinalizeModalOpen(false);
+                    setFinalizingOS(null);
+                  }}
+                  className="p-1 hover:bg-zinc-200 text-zinc-400 hover:text-zinc-600 rounded-lg transition-colors cursor-pointer"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <form onSubmit={handleSubmitFinalize} className="p-6 space-y-4 text-left">
+                <div>
+                  <label className="block text-xs font-bold text-zinc-500 mb-1">Como esta O.S. está sendo resolvida?</label>
+                  <select
+                    value={selectedFinalizationType}
+                    onChange={(e) => setSelectedFinalizationType(e.target.value)}
+                    className="w-full px-3 py-2 border border-zinc-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-1 focus:ring-zinc-900 bg-white"
+                  >
+                    {(config?.finalizationOptions || [
+                      'Pronto para Retirada',
+                      'Retirado Sem Reparo',
+                      'Devolvido ao Cliente'
+                    ]).map((opt) => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-zinc-500 mb-1">
+                    Observações de Finalização / Laudo Técnico
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={finalizationObservation}
+                    onChange={(e) => setFinalizationObservation(e.target.value)}
+                    placeholder="Descreva o motivo da devolução, laudo de não conserto ou observações finais..."
+                    className="w-full px-3 py-2 border border-zinc-200 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-zinc-900"
+                    required={
+                      selectedFinalizationType.toLowerCase().includes('sem reparo') || 
+                      selectedFinalizationType.toLowerCase().includes('devol') || 
+                      selectedFinalizationType.toLowerCase().includes('cancel')
+                    }
+                  />
+                  <p className="text-[10px] text-zinc-400 mt-1">
+                    *Obrigatório para devoluções ou aparelhos retirados sem reparo.
+                  </p>
+                </div>
+
+                {finalizingOS.paymentStatus !== 'pago' && (
+                  <div className="p-3 bg-zinc-50 border border-zinc-200 rounded-xl space-y-3">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="finalizeMarkAsPaid"
+                        checked={finalizeMarkAsPaid}
+                        onChange={(e) => setFinalizeMarkAsPaid(e.target.checked)}
+                        className="rounded border-zinc-300 text-zinc-900 focus:ring-zinc-900"
+                      />
+                      <label htmlFor="finalizeMarkAsPaid" className="text-xs font-bold text-zinc-700 select-none cursor-pointer">
+                        Registrar pagamento como RECEBIDO agora
+                      </label>
+                    </div>
+
+                    {finalizeMarkAsPaid && (
+                      <div>
+                        <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">
+                          Forma de Pagamento
+                        </label>
+                        <select
+                          value={finalizePaymentMethod}
+                          onChange={(e) => setFinalizePaymentMethod(e.target.value as any)}
+                          className="w-full px-2.5 py-1.5 border border-zinc-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-zinc-900 bg-white font-medium"
+                        >
+                          <option value="pix">PIX</option>
+                          <option value="dinheiro">Dinheiro</option>
+                          <option value="debito">Cartão de Débito</option>
+                          <option value="credito">Cartão de Crédito</option>
+                        </select>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="pt-2 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsFinalizeModalOpen(false);
+                      setFinalizingOS(null);
+                    }}
+                    className="flex-1 py-2 px-4 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 text-xs font-bold rounded-xl cursor-pointer"
+                  >
+                    Voltar
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 py-2 px-4 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl cursor-pointer shadow-xs"
+                  >
+                    Confirmar e Finalizar
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <style>{`
+        @media print {
+          body * {
+            visibility: hidden;
+          }
+          #printable-ticket, #printable-ticket * {
+            visibility: visible;
+          }
+          #printable-ticket {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            margin: 0 !important;
+            padding: 0 !important;
+            box-shadow: none !important;
+          }
+          .no-print {
+            display: none !important;
+          }
+        }
+      `}</style>
     </div>
   );
 }

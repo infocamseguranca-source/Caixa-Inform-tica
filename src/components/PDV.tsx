@@ -12,15 +12,20 @@ import {
   Percent, 
   DollarSign,
   AlertTriangle,
-  Sparkles
+  Sparkles,
+  ArrowUpRight,
+  ArrowDownRight,
+  Calendar
 } from 'lucide-react';
 import { Product, Staff, Transaction } from '../types';
 import { formatCurrency } from '../utils';
 import { motion, AnimatePresence } from 'motion/react';
+import { jsPDF } from 'jspdf';
 
 interface PDVProps {
   products: Product[];
   staffList: Staff[];
+  transactions: Transaction[];
   onAddProduct: (product: Omit<Product, 'id'>) => Promise<void>;
   onRegisterSale: (saleData: {
     items: { product: Product; qty: number }[];
@@ -37,6 +42,7 @@ interface PDVProps {
 export default function PDV({
   products,
   staffList,
+  transactions,
   onAddProduct,
   onRegisterSale,
   shopName,
@@ -53,6 +59,10 @@ export default function PDV({
   const [query, setQuery] = useState('');
   const [suggestions, setSuggestions] = useState<Product[]>([]);
   
+  // Custom price and quantity below product name search
+  const [customPrice, setCustomPrice] = useState('');
+  const [customQty, setCustomQty] = useState('1');
+  
   // New quick product form
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [quickName, setQuickName] = useState('');
@@ -61,6 +71,7 @@ export default function PDV({
 
   // Print invoice modal
   const [isInvoiceOpen, setIsInvoiceOpen] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [printPaperWidth, setPrintPaperWidth] = useState<'80mm' | 'A4'>('80mm');
   const [completedSale, setCompletedSale] = useState<{
     items: { product: Product; qty: number }[];
@@ -110,7 +121,7 @@ export default function PDV({
   };
 
   const updateCartQty = (pId: string, value: number) => {
-    const p = products.find(prod => prod.id === pId);
+    const p = products.find(prod => prod.id === pId) || cart.find(item => item.product.id === pId)?.product;
     if (!p) return;
     if (value > p.stock) {
       alert(`Quantidade máxima em estoque é ${p.stock}`);
@@ -123,6 +134,25 @@ export default function PDV({
     setCart(cart.map(item => 
       item.product.id === pId ? { ...item, qty: value } : item
     ));
+  };
+
+  const handleAddCustomItem = () => {
+    if (!query.trim()) return;
+    const price = parseFloat(customPrice.replace(',', '.')) || 0;
+    const qty = parseInt(customQty) || 1;
+    
+    const tempProduct: Product = {
+      id: `temp-${Date.now()}`,
+      name: query.trim(),
+      price: price,
+      stock: 99999
+    };
+    
+    setCart([...cart, { product: tempProduct, qty }]);
+    setQuery('');
+    setCustomPrice('');
+    setCustomQty('1');
+    setSuggestions([]);
   };
 
   const cartTotal = cart.reduce((acc, curr) => acc + (curr.product.price * curr.qty), 0);
@@ -152,12 +182,149 @@ export default function PDV({
     }
   };
 
-  const handleCheckout = async () => {
+  const handlePrintTransaction = (t: Transaction, autoOpen: boolean = false) => {
+    // Try to parse items from description
+    const items: any[] = [];
+    const desc = t.description;
+    
+    if (desc.startsWith('Venda PDV - ')) {
+      const itemsPart = desc.replace('Venda PDV - ', '');
+      const parts = itemsPart.split(', ');
+      parts.forEach(part => {
+        const match = part.match(/^(\d+)x\s+(.+)$/);
+        if (match) {
+          const qty = parseInt(match[1]);
+          const name = match[2];
+          items.push({
+            qty,
+            product: {
+              name,
+              price: t.amount / qty // Approximate price since we only have total per line or total overall
+            }
+          });
+        }
+      });
+    }
+
+    // Fallback if no items parsed or generic description
+    if (items.length === 0) {
+      items.push({
+        qty: 1,
+        product: {
+          name: t.description,
+          price: t.amount
+        }
+      });
+    }
+
+    const sellerObj = t.sellerId ? staffList.find(s => s.id === t.sellerId) : undefined;
+    const technicianObj = t.technicianId ? staffList.find(s => s.id === t.technicianId) : undefined;
+
+    const saleObj = {
+      invoiceNumber: t.id ? t.id.substring(0, 8).toUpperCase() : Math.floor(1000 + Math.random() * 9000).toString(),
+      date: t.date,
+      items,
+      total: t.amount,
+      paymentMethod: t.paymentMethod || 'dinheiro',
+      seller: sellerObj,
+      technician: technicianObj
+    };
+
+    downloadPDVReceiptPDF(saleObj);
+    
+    if (autoOpen) {
+      // Direct browser window print trigger if needed
+      window.print();
+    }
+  };
+
+  const downloadPDVReceiptPDF = (sale: any) => {
+    try {
+      const doc = new jsPDF({
+        orientation: 'p',
+        unit: 'mm',
+        format: 'a4'
+      });
+
+      doc.setFont('Helvetica', 'bold');
+      doc.setFontSize(16);
+      doc.text(shopName || 'INFO_CAM TECNOLOGIA', 14, 20);
+
+      doc.setFontSize(9);
+      doc.setFont('Helvetica', 'normal');
+      doc.text(`Contato: ${shopPhone || ''} | CNPJ/CPF: ${shopCnpjCpf || ''}`, 14, 26);
+      doc.text(`Data: ${new Date(sale.date).toLocaleString('pt-BR')}`, 14, 31);
+
+      doc.setFont('Helvetica', 'bold');
+      doc.setFontSize(14);
+      doc.text(`CUPOM DE VENDA: ${sale.invoiceNumber}`, 120, 20);
+
+      doc.setDrawColor(220, 220, 224);
+      doc.line(14, 35, 196, 35);
+
+      doc.setFontSize(10);
+      doc.text('ITENS VENDIDOS', 14, 42);
+
+      let y = 48;
+      doc.setFont('Helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.text('PRODUTO', 14, y);
+      doc.text('QTD', 110, y);
+      doc.text('PRECO UNIT.', 135, y);
+      doc.text('TOTAL', 170, y);
+      doc.line(14, y + 2, 196, y + 2);
+      y += 7;
+
+      doc.setFont('Helvetica', 'normal');
+      sale.items.forEach((item: any) => {
+        if (y > 270) {
+          doc.addPage();
+          y = 20;
+        }
+        doc.text(item.product.name.substring(0, 45), 14, y);
+        doc.text(item.qty.toString(), 110, y);
+        doc.text(formatCurrency(item.product.price), 135, y);
+        doc.text(formatCurrency(item.product.price * item.qty), 170, y);
+        y += 6;
+      });
+
+      doc.line(14, y, 196, y);
+      y += 6;
+
+      doc.setFont('Helvetica', 'bold');
+      doc.text(`VALOR TOTAL: ${formatCurrency(sale.total)}`, 14, y);
+      doc.text(`FORMA DE PAGAMENTO: ${sale.paymentMethod.toUpperCase()}`, 110, y);
+
+      if (sale.seller) {
+        y += 6;
+        doc.text(`Atendente: ${sale.seller.name}`, 14, y);
+      }
+      if (sale.technician) {
+        y += 6;
+        doc.text(`Tecnico: ${sale.technician.name}`, 14, y);
+      }
+
+      y += 15;
+      doc.setFont('Helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.text('Obrigado pela preferência! Volte sempre.', 14, y);
+
+      doc.save(`Venda_${sale.invoiceNumber}.pdf`);
+    } catch (err) {
+      console.error('Erro ao gerar PDF da venda:', err);
+    }
+  };
+
+  const handleCheckout = () => {
     if (cart.length === 0) {
       alert('Adicione pelo menos um produto ao carrinho!');
       return;
     }
+    setShowConfirmModal(true);
+  };
 
+  const confirmRegisterSale = async () => {
+    setShowConfirmModal(false);
     try {
       await onRegisterSale({
         items: cart,
@@ -169,7 +336,7 @@ export default function PDV({
 
       // Prepare state for receipt printer
       const invoiceNumber = `NF-${Math.floor(100000 + Math.random() * 900000)}`;
-      setCompletedSale({
+      const saleObj = {
         items: cart,
         seller: staffList.find(s => s.id === selectedSeller),
         technician: staffList.find(s => s.id === selectedTechnician),
@@ -177,7 +344,12 @@ export default function PDV({
         total: cartTotal,
         date: new Date().toISOString(),
         invoiceNumber
-      });
+      };
+
+      setCompletedSale(saleObj);
+      
+      // Save PDF document automatically
+      downloadPDVReceiptPDF(saleObj);
 
       setCart([]);
       setSelectedSeller('');
@@ -212,17 +384,51 @@ export default function PDV({
                 className="w-full pl-9 pr-3 py-2 border border-zinc-200 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-zinc-900 bg-zinc-50/50"
               />
             </div>
-            <button
-              onClick={() => {
-                setQuickName(query);
-                setQuickAddOpen(true);
-              }}
-              className="px-3.5 py-2 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 border border-zinc-200 rounded-xl text-xs font-bold flex items-center gap-1 cursor-pointer transition-all"
-              title="Adicionar produto não cadastrado"
-            >
-              <Plus size={16} /> Novo
-            </button>
+            {query.trim().length > 0 && suggestions.length === 0 && (
+              <button
+                onClick={() => {
+                  setQuickName(query);
+                  setQuickAddOpen(true);
+                }}
+                className="px-3.5 py-2 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 border border-zinc-200 rounded-xl text-xs font-bold flex items-center gap-1 cursor-pointer transition-all shrink-0"
+                title="Cadastrar novo produto permanente"
+              >
+                <Plus size={16} /> Novo
+              </button>
+            )}
           </div>
+
+          {/* Quick Custom Selling Fields */}
+          {query.trim().length > 0 && (
+            <div className="mt-3 pt-3 border-t border-zinc-100 grid grid-cols-1 md:grid-cols-3 gap-2 items-end">
+              <div>
+                <label className="block text-[10px] font-bold text-zinc-400 mb-1">Preço do Item (R$)</label>
+                <input
+                  type="text"
+                  placeholder="0,00"
+                  value={customPrice}
+                  onChange={(e) => setCustomPrice(e.target.value)}
+                  className="w-full px-2.5 py-1.5 border border-zinc-200 rounded-xl text-xs bg-zinc-50 focus:outline-none focus:ring-1 focus:ring-zinc-900"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-zinc-400 mb-1">Quantidade</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={customQty}
+                  onChange={(e) => setCustomQty(e.target.value)}
+                  className="w-full px-2.5 py-1.5 border border-zinc-200 rounded-xl text-xs bg-zinc-50 focus:outline-none focus:ring-1 focus:ring-zinc-900"
+                />
+              </div>
+              <button
+                onClick={handleAddCustomItem}
+                className="w-full px-3 py-2 bg-zinc-900 text-white font-bold rounded-xl text-xs hover:bg-zinc-800 transition-all flex items-center justify-center gap-1 cursor-pointer shadow-sm"
+              >
+                <Plus size={14} /> Adicionar Avulso
+              </button>
+            </div>
+          )}
 
           {/* Floating Suggestion Box */}
           <AnimatePresence>
@@ -349,7 +555,7 @@ export default function PDV({
               >
                 <option value="">Sem vendedor (Nenhuma comissão)</option>
                 {staffList.filter(s => s.role === 'vendedor').map(s => (
-                  <option key={s.id} value={s.id}>{s.name} ({s.commission}%)</option>
+                  <option key={s.id} value={s.id}>{s.name}</option>
                 ))}
               </select>
             </div>
@@ -363,7 +569,7 @@ export default function PDV({
               >
                 <option value="">Nenhum técnico associado</option>
                 {staffList.filter(s => s.role === 'tecnico').map(s => (
-                  <option key={s.id} value={s.id}>{s.name} ({s.commission}%)</option>
+                  <option key={s.id} value={s.id}>{s.name}</option>
                 ))}
               </select>
             </div>
@@ -377,6 +583,101 @@ export default function PDV({
           >
             Finalizar e Receber Venda
           </button>
+        </div>
+
+        {/* Compact Cash Register Widget */}
+        <div className="bg-white border border-zinc-150 rounded-2xl p-5 space-y-4 shadow-xs">
+          <div className="flex justify-between items-center border-b border-zinc-100 pb-2">
+            <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Fluxo de Caixa (Lançamentos Recentes)</h3>
+            <span className="text-[10px] bg-zinc-100 text-zinc-600 font-bold px-2 py-0.5 rounded-full">PDV Ativo</span>
+          </div>
+
+          {/* Quick Stats */}
+          <div className="grid grid-cols-3 gap-2 text-center">
+            <div className="bg-emerald-50/50 border border-emerald-100 p-2 rounded-xl">
+              <span className="text-[9px] font-bold text-emerald-600 block uppercase">Entradas</span>
+              <span className="text-xs font-extrabold text-emerald-700">
+                {formatCurrency(transactions.filter(t => t.type === 'entrada').reduce((sum, t) => sum + t.amount, 0))}
+              </span>
+            </div>
+            <div className="bg-rose-50/50 border border-rose-100 p-2 rounded-xl">
+              <span className="text-[9px] font-bold text-rose-600 block uppercase">Saídas</span>
+              <span className="text-xs font-extrabold text-rose-700">
+                {formatCurrency(transactions.filter(t => t.type === 'saida').reduce((sum, t) => sum + t.amount, 0))}
+              </span>
+            </div>
+            <div className="bg-zinc-50 border border-zinc-150 p-2 rounded-xl">
+              <span className="text-[9px] font-bold text-zinc-500 block uppercase">Saldo Geral</span>
+              <span className="text-xs font-black text-zinc-850">
+                {formatCurrency(
+                  transactions.filter(t => t.type === 'entrada').reduce((sum, t) => sum + t.amount, 0) -
+                  transactions.filter(t => t.type === 'saida').reduce((sum, t) => sum + t.amount, 0)
+                )}
+              </span>
+            </div>
+          </div>
+
+          {/* Transactions list */}
+          <div className="space-y-2 max-h-[250px] overflow-y-auto pr-1">
+            {transactions.length === 0 ? (
+              <p className="text-center text-[11px] text-zinc-400 py-6">Nenhum lançamento registrado no caixa.</p>
+            ) : (
+              transactions.slice(0, 8).map((t) => {
+                const isPDVSale = t.description.toLowerCase().includes('venda pdv');
+                return (
+                  <div key={t.id} className="p-2.5 border border-zinc-100 rounded-xl hover:bg-zinc-50/50 transition-colors flex justify-between items-center gap-2">
+                    <div className="space-y-0.5 min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded-md ${
+                          t.type === 'entrada' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+                        }`}>
+                          {t.type === 'entrada' ? 'Entrada' : 'Saída'}
+                        </span>
+                        {isPDVSale && (
+                          <span className="text-[8px] bg-blue-100 text-blue-800 font-extrabold px-1 rounded uppercase tracking-wide">
+                            PDV
+                          </span>
+                        )}
+                        <span className="text-[9px] text-zinc-400">
+                          {new Date(t.date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
+                      <p className="text-[11px] font-semibold text-zinc-700 truncate" title={t.description}>
+                        {t.description}
+                      </p>
+                    </div>
+                    
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className={`text-xs font-bold ${
+                        t.type === 'entrada' ? 'text-emerald-600' : 'text-rose-600'
+                      }`}>
+                        {t.type === 'entrada' ? '+' : '-'}{formatCurrency(t.amount)}
+                      </span>
+                      
+                      <div className="flex items-center gap-1 border-l border-zinc-200 pl-1.5 ml-1.5">
+                        <button
+                          type="button"
+                          onClick={() => handlePrintTransaction(t, false)}
+                          className="p-1 hover:bg-zinc-100 rounded-md text-zinc-400 hover:text-emerald-600 cursor-pointer transition-colors"
+                          title="Abrir nota em PDF"
+                        >
+                          <FileText size={12} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handlePrintTransaction(t, true)}
+                          className="p-1 hover:bg-zinc-100 rounded-md text-zinc-400 hover:text-blue-600 cursor-pointer transition-colors"
+                          title="Imprimir Cupom de Venda"
+                        >
+                          <Printer size={12} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
         </div>
       </div>
 
@@ -532,17 +833,103 @@ export default function PDV({
               <div className="p-4 bg-zinc-50 border-t border-zinc-100 flex gap-2">
                 <button
                   onClick={() => { setIsInvoiceOpen(false); setCompletedSale(null); }}
-                  className="flex-1 py-2 px-4 bg-zinc-200 hover:bg-zinc-300 text-zinc-700 text-xs font-bold rounded-lg cursor-pointer"
+                  className="flex-1 py-2 px-3 bg-zinc-200 hover:bg-zinc-300 text-zinc-700 text-xs font-bold rounded-lg cursor-pointer text-center"
                 >
                   Fechar
+                </button>
+                <button
+                  onClick={() => downloadPDVReceiptPDF(completedSale)}
+                  className="flex-1 py-2 px-3 bg-zinc-100 hover:bg-zinc-200 text-zinc-800 text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 cursor-pointer border border-zinc-200"
+                >
+                  <FileText size={14} /> Salvar PDF
                 </button>
                 <button
                   onClick={() => {
                     window.print();
                   }}
-                  className="flex-1 py-2 px-4 bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 cursor-pointer"
+                  className="flex-1 py-2 px-3 bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 cursor-pointer"
                 >
                   <Printer size={14} /> Imprimir Cupom
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* CONFIRMATION WARNING DIALOG */}
+      <AnimatePresence>
+        {showConfirmModal && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white w-full max-w-md rounded-2xl border border-zinc-150 shadow-2xl overflow-hidden p-6 space-y-4"
+            >
+              <div className="flex items-center gap-2.5 text-zinc-950 font-sans font-bold border-b border-zinc-100 pb-3">
+                <AlertTriangle className="text-amber-500 shrink-0" size={20} />
+                <span className="text-sm">Confirmar Finalização da Venda</span>
+              </div>
+
+              <div className="space-y-3">
+                <p className="text-xs text-zinc-600">
+                  Atenção! Você está prestes a finalizar esta venda e receber o pagamento. Certifique-se de que os dados estão corretos:
+                </p>
+
+                <div className="bg-zinc-50 border border-zinc-150 rounded-xl p-3 space-y-1.5 text-xs text-zinc-700">
+                  <div className="flex justify-between font-bold text-zinc-900 pb-1 border-b border-zinc-200">
+                    <span>Valor a Receber:</span>
+                    <span className="text-sm text-zinc-950 font-black">{formatCurrency(cartTotal)}</span>
+                  </div>
+                  <div className="flex justify-between pt-1">
+                    <span>Forma de Recebimento:</span>
+                    <span className="font-bold capitalize text-zinc-900">{paymentMethod === 'debito' ? 'Cartão de Débito' : paymentMethod === 'credito' ? 'Cartão de Crédito' : paymentMethod}</span>
+                  </div>
+                  {selectedSeller && (
+                    <div className="flex justify-between">
+                      <span>Vendedor:</span>
+                      <span className="font-semibold text-zinc-900">
+                        {staffList.find(s => s.id === selectedSeller)?.name}
+                      </span>
+                    </div>
+                  )}
+                  {selectedTechnician && (
+                    <div className="flex justify-between">
+                      <span>Técnico:</span>
+                      <span className="font-semibold text-zinc-900">
+                        {staffList.find(s => s.id === selectedTechnician)?.name}
+                      </span>
+                    </div>
+                  )}
+                  <div className="pt-2 border-t border-zinc-200">
+                    <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">Itens a Baixar do Estoque:</p>
+                    <div className="max-h-24 overflow-y-auto space-y-0.5 text-[11px] text-zinc-600">
+                      {cart.map((item, idx) => (
+                        <div key={idx} className="flex justify-between">
+                          <span className="truncate max-w-[80%]">{item.qty}x {item.product.name}</span>
+                          <span className="font-medium shrink-0">{formatCurrency(item.product.price * item.qty)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-2 pt-3 border-t border-zinc-100 text-xs font-bold">
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmModal(false)}
+                  className="flex-1 py-2.5 px-3 bg-zinc-100 text-zinc-600 rounded-xl cursor-pointer hover:bg-zinc-200"
+                >
+                  Voltar / Corrigir
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmRegisterSale}
+                  className="flex-1 py-2.5 px-3 bg-emerald-600 text-white rounded-xl cursor-pointer hover:bg-emerald-700 flex items-center justify-center gap-1.5 shadow-sm"
+                >
+                  <Check size={14} /> Confirmar & Finalizar
                 </button>
               </div>
             </motion.div>

@@ -6,16 +6,61 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    // Helper to check ownership for standard collections
+    function isOwner(resourceData) {
+      return resourceData.ownerId == request.auth.uid;
+    }
+
     match /transactions/{transactionId} {
-      allow read, write: if isAuthenticated();
+      allow read, delete: if isAuthenticated() && resource.data.ownerId == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.ownerId == request.auth.uid;
+      allow update: if isAuthenticated() && resource.data.ownerId == request.auth.uid && request.resource.data.ownerId == request.auth.uid;
     }
 
     match /service_orders/{osId} {
-      allow read, write: if isAuthenticated();
+      allow read, delete: if isAuthenticated() && resource.data.ownerId == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.ownerId == request.auth.uid;
+      allow update: if isAuthenticated() && resource.data.ownerId == request.auth.uid && request.resource.data.ownerId == request.auth.uid;
     }
 
     match /backup_history/{backupId} {
-      allow read, write: if isAuthenticated();
+      allow read, delete: if isAuthenticated() && resource.data.ownerId == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.ownerId == request.auth.uid;
+      allow update: if isAuthenticated() && resource.data.ownerId == request.auth.uid && request.resource.data.ownerId == request.auth.uid;
+    }
+
+    match /products/{productId} {
+      allow read, delete: if isAuthenticated() && resource.data.ownerId == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.ownerId == request.auth.uid;
+      allow update: if isAuthenticated() && resource.data.ownerId == request.auth.uid && request.resource.data.ownerId == request.auth.uid;
+    }
+
+    match /staff/{staffId} {
+      allow read, delete: if isAuthenticated() && resource.data.ownerId == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.ownerId == request.auth.uid;
+      allow update: if isAuthenticated() && resource.data.ownerId == request.auth.uid && request.resource.data.ownerId == request.auth.uid;
+    }
+
+    match /appointments/{appointmentId} {
+      allow read, delete: if isAuthenticated() && resource.data.ownerId == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.ownerId == request.auth.uid;
+      allow update: if isAuthenticated() && resource.data.ownerId == request.auth.uid && request.resource.data.ownerId == request.auth.uid;
+    }
+
+    match /equipment_purchases/{purchaseId} {
+      allow read, delete: if isAuthenticated() && resource.data.ownerId == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.ownerId == request.auth.uid;
+      allow update: if isAuthenticated() && resource.data.ownerId == request.auth.uid && request.resource.data.ownerId == request.auth.uid;
+    }
+
+    match /customers/{customerId} {
+      allow read, delete: if isAuthenticated() && resource.data.ownerId == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.ownerId == request.auth.uid;
+      allow update: if isAuthenticated() && resource.data.ownerId == request.auth.uid && request.resource.data.ownerId == request.auth.uid;
+    }
+
+    match /shop_config/{userId} {
+      allow read, write: if isAuthenticated() && userId == request.auth.uid;
     }
   }
 }

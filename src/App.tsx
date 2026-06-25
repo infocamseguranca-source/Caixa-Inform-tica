@@ -16,7 +16,8 @@ import {
   Calendar,
   Settings,
   Download,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Lock
 } from 'lucide-react';
 import { 
   collection, 
@@ -27,11 +28,12 @@ import {
   deleteDoc, 
   writeBatch, 
   query,
-  setDoc
+  setDoc,
+  where
 } from 'firebase/firestore';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { db, auth, googleSignIn, logout, getAccessToken } from './firebase';
-import { Transaction, ServiceOrder, BackupHistory, Product, Staff, Appointment, ShopConfig } from './types';
+import { Transaction, ServiceOrder, BackupHistory, Product, Staff, Appointment, ShopConfig, EquipmentPurchase, Customer } from './types';
 import { generateOSNumber, exportToExcel } from './utils';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -44,6 +46,8 @@ import Products from './components/Products';
 import PDV from './components/PDV';
 import Appointments from './components/Appointments';
 import SettingsShop from './components/SettingsShop';
+import EquipmentPurchases from './components/EquipmentPurchases';
+import Customers from './components/Customers';
 
 const SAMPLE_TRANSACTIONS = [
   {
@@ -178,8 +182,12 @@ const DEFAULT_CONFIG: ShopConfig = {
     'Outros'
   ],
   osStartNumber: 1001,
-  menuOrder: ['dashboard', 'caixa', 'vendas', 'produtos', 'os', 'agendamentos', 'backup', 'settings_shop'],
-  autoSaveOSToDrive: false
+  menuOrder: ['dashboard', 'caixa', 'vendas', 'produtos', 'os', 'clientes', 'compras', 'agendamentos', 'backup', 'settings_shop'],
+  autoSaveOSToDrive: false,
+  finalizationOptions: ['Pronto para Retirada', 'Retirado Sem Reparo', 'Devolvido ao Cliente', 'Entregue para outra Assistência', 'Sem Conserto / Descarte'],
+  purchaseCategories: ['Informatica', 'Celulares'],
+  purchaseEquipmentTypes: ['Computador', 'Notebook', 'Celular', 'Tablet', 'Monitor', 'Impressora', 'Outros'],
+  enablePurchaseSignature: true
 };
 
 export default function App() {
@@ -191,6 +199,10 @@ export default function App() {
   const [needsAuth, setNeedsAuth] = useState(false);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   
+  // Auth Modal Reminder
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authModalMessage, setAuthModalMessage] = useState('');
+
   // Data state
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [serviceOrders, setServiceOrders] = useState<ServiceOrder[]>([]);
@@ -198,6 +210,8 @@ export default function App() {
   const [products, setProducts] = useState<Product[]>([]);
   const [staffList, setStaffList] = useState<Staff[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [equipmentPurchases, setEquipmentPurchases] = useState<EquipmentPurchase[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
   const [shopConfig, setShopConfig] = useState<ShopConfig>(DEFAULT_CONFIG);
   
   const [loading, setLoading] = useState(true);
@@ -243,6 +257,7 @@ export default function App() {
       const localProducts = localStorage.getItem('infocam_products');
       const localStaff = localStorage.getItem('infocam_staff');
       const localAppts = localStorage.getItem('infocam_appointments');
+      const localPurchases = localStorage.getItem('infocam_purchases');
       const localConfig = localStorage.getItem('infocam_config');
 
       if (localTx) {
@@ -286,6 +301,19 @@ export default function App() {
         setAppointments([]);
       }
 
+      if (localPurchases) {
+        setEquipmentPurchases(JSON.parse(localPurchases));
+      } else {
+        setEquipmentPurchases([]);
+      }
+
+      const localCustomers = localStorage.getItem('infocam_customers');
+      if (localCustomers) {
+        setCustomers(JSON.parse(localCustomers));
+      } else {
+        setCustomers([]);
+      }
+
       if (localConfig) {
         setShopConfig(JSON.parse(localConfig));
       } else {
@@ -295,71 +323,113 @@ export default function App() {
     }
 
     // Subscribe to transactions collection
-    const unsubTransactions = onSnapshot(collection(db, 'transactions'), (snapshot) => {
-      const data: Transaction[] = [];
-      snapshot.forEach((doc) => {
-        data.push({ id: doc.id, ...doc.data() } as Transaction);
-      });
-      setTransactions(data);
-    });
+    const unsubTransactions = onSnapshot(
+      query(collection(db, 'transactions'), where('ownerId', '==', user.uid)), 
+      (snapshot) => {
+        const data: Transaction[] = [];
+        snapshot.forEach((doc) => {
+          data.push({ id: doc.id, ...doc.data() } as Transaction);
+        });
+        setTransactions(data);
+      }
+    );
 
     // Subscribe to service orders collection
-    const unsubOS = onSnapshot(collection(db, 'service_orders'), (snapshot) => {
-      const data: ServiceOrder[] = [];
-      snapshot.forEach((doc) => {
-        data.push({ id: doc.id, ...doc.data() } as ServiceOrder);
-      });
-      setServiceOrders(data);
-    });
+    const unsubOS = onSnapshot(
+      query(collection(db, 'service_orders'), where('ownerId', '==', user.uid)), 
+      (snapshot) => {
+        const data: ServiceOrder[] = [];
+        snapshot.forEach((doc) => {
+          data.push({ id: doc.id, ...doc.data() } as ServiceOrder);
+        });
+        setServiceOrders(data);
+      }
+    );
 
     // Subscribe to backup history collection
-    const unsubBackups = onSnapshot(collection(db, 'backup_history'), (snapshot) => {
-      const data: BackupHistory[] = [];
-      snapshot.forEach((doc) => {
-        data.push({ id: doc.id, ...doc.data() } as BackupHistory);
-      });
-      setBackupHistory(data);
-    });
+    const unsubBackups = onSnapshot(
+      query(collection(db, 'backup_history'), where('ownerId', '==', user.uid)), 
+      (snapshot) => {
+        const data: BackupHistory[] = [];
+        snapshot.forEach((doc) => {
+          data.push({ id: doc.id, ...doc.data() } as BackupHistory);
+        });
+        setBackupHistory(data);
+      }
+    );
 
     // Subscribe to products collection
-    const unsubProducts = onSnapshot(collection(db, 'products'), (snapshot) => {
-      const data: Product[] = [];
-      snapshot.forEach((doc) => {
-        data.push({ id: doc.id, ...doc.data() } as Product);
-      });
-      setProducts(data);
-    });
+    const unsubProducts = onSnapshot(
+      query(collection(db, 'products'), where('ownerId', '==', user.uid)), 
+      (snapshot) => {
+        const data: Product[] = [];
+        snapshot.forEach((doc) => {
+          data.push({ id: doc.id, ...doc.data() } as Product);
+        });
+        setProducts(data);
+      }
+    );
 
     // Subscribe to staff collection
-    const unsubStaff = onSnapshot(collection(db, 'staff'), (snapshot) => {
-      const data: Staff[] = [];
-      snapshot.forEach((doc) => {
-        data.push({ id: doc.id, ...doc.data() } as Staff);
-      });
-      setStaffList(data);
-    });
+    const unsubStaff = onSnapshot(
+      query(collection(db, 'staff'), where('ownerId', '==', user.uid)), 
+      (snapshot) => {
+        const data: Staff[] = [];
+        snapshot.forEach((doc) => {
+          data.push({ id: doc.id, ...doc.data() } as Staff);
+        });
+        setStaffList(data);
+      }
+    );
 
     // Subscribe to appointments collection
-    const unsubAppointments = onSnapshot(collection(db, 'appointments'), (snapshot) => {
-      const data: Appointment[] = [];
-      snapshot.forEach((doc) => {
-        data.push({ id: doc.id, ...doc.data() } as Appointment);
-      });
-      setAppointments(data);
-    });
+    const unsubAppointments = onSnapshot(
+      query(collection(db, 'appointments'), where('ownerId', '==', user.uid)), 
+      (snapshot) => {
+        const data: Appointment[] = [];
+        snapshot.forEach((doc) => {
+          data.push({ id: doc.id, ...doc.data() } as Appointment);
+        });
+        setAppointments(data);
+      }
+    );
 
-    // Subscribe to shop configuration document
-    const unsubConfig = onSnapshot(doc(db, 'shop_config', 'config'), (docSnap) => {
+    // Subscribe to customers collection
+    const unsubCustomers = onSnapshot(
+      query(collection(db, 'customers'), where('ownerId', '==', user.uid)), 
+      (snapshot) => {
+        const data: Customer[] = [];
+        snapshot.forEach((doc) => {
+          data.push({ id: doc.id, ...doc.data() } as Customer);
+        });
+        setCustomers(data);
+      }
+    );
+
+    // Subscribe to shop configuration document (per user.uid)
+    const unsubConfig = onSnapshot(doc(db, 'shop_config', user.uid), (docSnap) => {
       if (docSnap.exists()) {
         setShopConfig(docSnap.data() as ShopConfig);
       } else {
         // Automatically save initial shop config to Firestore
-        setDoc(doc(db, 'shop_config', 'config'), DEFAULT_CONFIG).catch(err => {
+        setDoc(doc(db, 'shop_config', user.uid), DEFAULT_CONFIG).catch(err => {
           console.error('Failed to write initial shop config:', err);
         });
         setShopConfig(DEFAULT_CONFIG);
       }
     });
+
+    // Subscribe to equipment purchases collection
+    const unsubPurchases = onSnapshot(
+      query(collection(db, 'equipment_purchases'), where('ownerId', '==', user.uid)), 
+      (snapshot) => {
+        const data: EquipmentPurchase[] = [];
+        snapshot.forEach((doc) => {
+          data.push({ id: doc.id, ...doc.data() } as EquipmentPurchase);
+        });
+        setEquipmentPurchases(data);
+      }
+    );
 
     return () => {
       unsubTransactions();
@@ -368,7 +438,9 @@ export default function App() {
       unsubProducts();
       unsubStaff();
       unsubAppointments();
+      unsubCustomers();
       unsubConfig();
+      unsubPurchases();
     };
   }, [user]);
 
@@ -430,6 +502,11 @@ export default function App() {
     if (loading) return;
     localStorage.setItem('infocam_appointments', JSON.stringify(appointments));
   }, [appointments, loading]);
+
+  useEffect(() => {
+    if (loading) return;
+    localStorage.setItem('infocam_purchases', JSON.stringify(equipmentPurchases));
+  }, [equipmentPurchases, loading]);
 
   useEffect(() => {
     if (loading) return;
@@ -569,34 +646,59 @@ export default function App() {
     }
   };
 
+  // Authentication Guard for Write Actions (Strictly enforces Google Login)
+  const checkAuth = (message: string): boolean => {
+    if (!user) {
+      setAuthModalMessage(message);
+      setShowAuthModal(true);
+      return false;
+    }
+    return true;
+  };
+
   // CRUD Transaction Operations
   const handleAddTransaction = async (item: Omit<Transaction, 'id'>) => {
-    if (user) {
-      await addDoc(collection(db, 'transactions'), item);
-    } else {
-      const newTx: Transaction = { id: `tx-${Date.now()}`, ...item };
-      setTransactions(prev => [newTx, ...prev]);
-    }
+    if (!checkAuth('Para realizar novos lançamentos no fluxo de caixa real, conecte sua conta do Google.')) return;
+    await addDoc(collection(db, 'transactions'), cleanPayload({ ...item, ownerId: user.uid }));
   };
 
   const handleEditTransaction = async (id: string, updatedFields: Partial<Transaction>) => {
-    if (user) {
-      await updateDoc(doc(db, 'transactions', id), updatedFields);
-    } else {
-      setTransactions(prev => prev.map(t => t.id === id ? { ...t, ...updatedFields } : t));
-    }
+    if (!checkAuth('Para editar lançamentos no fluxo de caixa real, conecte sua conta do Google.')) return;
+    await updateDoc(doc(db, 'transactions', id), cleanPayload(updatedFields));
   };
 
   const handleDeleteTransaction = async (id: string) => {
-    if (user) {
-      await deleteDoc(doc(db, 'transactions', id));
-    } else {
-      setTransactions(prev => prev.filter(t => t.id !== id));
+    if (!checkAuth('Para excluir lançamentos no fluxo de caixa real, conecte sua conta do Google.')) return;
+    await deleteDoc(doc(db, 'transactions', id));
+  };
+
+  // Utility to remove undefined values recursively for safe Firestore updates
+  const cleanPayload = (obj: any): any => {
+    if (obj === undefined) return null;
+    if (obj === null) return null;
+    if (Array.isArray(obj)) {
+      return obj.map(item => cleanPayload(item));
     }
+    if (typeof obj === 'object') {
+      const cleaned: any = {};
+      Object.keys(obj).forEach(key => {
+        const val = obj[key];
+        if (val !== undefined) {
+          cleaned[key] = cleanPayload(val);
+        }
+      });
+      return cleaned;
+    }
+    return obj;
   };
 
   // CRUD OS Operations
   const handleAddOS = async (item: Omit<ServiceOrder, 'id' | 'osNumber' | 'createdAt' | 'updatedAt'>): Promise<ServiceOrder> => {
+    if (!user) {
+      setAuthModalMessage('Para abrir ordens de serviço reais, conecte sua conta do Google.');
+      setShowAuthModal(true);
+      return { id: `fake-${Date.now()}`, osNumber: 'OS-TEMP', createdAt: '', updatedAt: '', status: 'aguardando', totalAmount: 0, paymentStatus: 'pendente', ...item } as any;
+    }
     const osNumber = generateOSNumber();
     const osPayload = {
       ...item,
@@ -604,122 +706,112 @@ export default function App() {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
-    if (user) {
-      const docRef = await addDoc(collection(db, 'service_orders'), osPayload);
-      return { id: docRef.id, ...osPayload };
-    } else {
-      const id = `os-${Date.now()}`;
-      const newOS: ServiceOrder = { id, ...osPayload };
-      setServiceOrders(prev => [newOS, ...prev]);
-      return newOS;
-    }
+    const docRef = await addDoc(collection(db, 'service_orders'), cleanPayload({ ...osPayload, ownerId: user.uid }));
+    return { id: docRef.id, ...osPayload };
   };
 
   const handleEditOS = async (id: string, updatedFields: Partial<ServiceOrder>): Promise<ServiceOrder> => {
-    const now = new Date().toISOString();
-    if (user) {
-      await updateDoc(doc(db, 'service_orders', id), {
-        ...updatedFields,
-        updatedAt: now
-      });
-      const existing = serviceOrders.find(o => o.id === id);
-      return { ...existing, ...updatedFields, id, updatedAt: now } as ServiceOrder;
-    } else {
-      let updatedOS: ServiceOrder | null = null;
-      setServiceOrders(prev => prev.map(os => {
-        if (os.id === id) {
-          updatedOS = { ...os, ...updatedFields, updatedAt: now };
-          return updatedOS;
-        }
-        return os;
-      }));
-      return updatedOS || ({ ...updatedFields, id, updatedAt: now } as ServiceOrder);
+    if (!checkAuth('Para salvar alterações em ordens de serviço reais, conecte sua conta do Google.')) {
+      return { id } as any;
     }
+    const now = new Date().toISOString();
+    await updateDoc(doc(db, 'service_orders', id), cleanPayload({
+      ...updatedFields,
+      updatedAt: now
+    }));
+    const existing = serviceOrders.find(o => o.id === id);
+    return { ...existing, ...updatedFields, id, updatedAt: now } as ServiceOrder;
   };
 
   const handleDeleteOS = async (id: string) => {
-    if (user) {
-      await deleteDoc(doc(db, 'service_orders', id));
-    } else {
-      setServiceOrders(prev => prev.filter(os => os.id !== id));
-    }
+    if (!checkAuth('Para deletar ordens de serviço reais, conecte sua conta do Google.')) return;
+    await deleteDoc(doc(db, 'service_orders', id));
+  };
+
+  // CRUD Customer Operations
+  const handleAddCustomer = async (item: Omit<Customer, 'id' | 'createdAt' | 'updatedAt'>) => {
+    if (!checkAuth('Para cadastrar novos clientes no banco de dados real, conecte sua conta do Google.')) return;
+    const customerPayload = {
+      ...item,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    await addDoc(collection(db, 'customers'), cleanPayload({ ...customerPayload, ownerId: user.uid }));
+  };
+
+  const handleEditCustomer = async (id: string, updatedFields: Partial<Customer>) => {
+    if (!checkAuth('Para editar detalhes de clientes no banco de dados real, conecte sua conta do Google.')) return;
+    const updated = {
+      ...updatedFields,
+      updatedAt: new Date().toISOString()
+    };
+    await updateDoc(doc(db, 'customers', id), cleanPayload(updated));
+  };
+
+  const handleDeleteCustomer = async (id: string) => {
+    if (!checkAuth('Para excluir clientes do banco de dados real, conecte sua conta do Google.')) return;
+    await deleteDoc(doc(db, 'customers', id));
+  };
+
+  // CRUD Equipment Purchase Operations
+  const handleAddPurchase = async (item: Omit<EquipmentPurchase, 'id' | 'date'>) => {
+    if (!checkAuth('Para registrar compras de equipamentos reais, conecte sua conta do Google.')) return;
+    const purchasePayload = {
+      ...item,
+      date: new Date().toISOString()
+    };
+    await addDoc(collection(db, 'equipment_purchases'), cleanPayload({ ...purchasePayload, ownerId: user.uid }));
   };
 
   // CRUD Product Operations
   const handleAddProduct = async (item: Omit<Product, 'id'>) => {
-    if (user) {
-      await addDoc(collection(db, 'products'), item);
-    } else {
-      const newProd: Product = { id: `p-${Date.now()}`, ...item };
-      setProducts(prev => [newProd, ...prev]);
-    }
+    if (!checkAuth('Para cadastrar novos produtos no estoque real, conecte sua conta do Google.')) return;
+    await addDoc(collection(db, 'products'), cleanPayload({ ...item, ownerId: user.uid }));
   };
 
   const handleEditProduct = async (id: string, updatedFields: Partial<Product>) => {
-    if (user) {
-      await updateDoc(doc(db, 'products', id), updatedFields);
-    } else {
-      setProducts(prev => prev.map(p => p.id === id ? { ...p, ...updatedFields } : p));
-    }
+    if (!checkAuth('Para editar produtos no estoque real, conecte sua conta do Google.')) return;
+    await updateDoc(doc(db, 'products', id), cleanPayload(updatedFields));
   };
 
   const handleDeleteProduct = async (id: string) => {
-    if (user) {
-      await deleteDoc(doc(db, 'products', id));
-    } else {
-      setProducts(prev => prev.filter(p => p.id !== id));
-    }
+    if (!checkAuth('Para excluir produtos do estoque real, conecte sua conta do Google.')) return;
+    await deleteDoc(doc(db, 'products', id));
   };
 
   // CRUD Staff Operations
   const handleAddStaff = async (item: Omit<Staff, 'id'>) => {
-    if (user) {
-      await addDoc(collection(db, 'staff'), item);
-    } else {
-      const newStaff: Staff = { id: `s-${Date.now()}`, ...item };
-      setStaffList(prev => [newStaff, ...prev]);
-    }
+    if (!checkAuth('Para cadastrar novos membros da equipe real, conecte sua conta do Google.')) return;
+    await addDoc(collection(db, 'staff'), cleanPayload({ ...item, ownerId: user.uid }));
   };
 
   const handleDeleteStaff = async (id: string) => {
-    if (user) {
-      await deleteDoc(doc(db, 'staff', id));
-    } else {
-      setStaffList(prev => prev.filter(s => s.id !== id));
-    }
+    if (!checkAuth('Para remover membros da equipe real, conecte sua conta do Google.')) return;
+    await deleteDoc(doc(db, 'staff', id));
   };
 
   // CRUD Appointment Operations
   const handleAddAppointment = async (item: Omit<Appointment, 'id' | 'notified'>) => {
+    if (!checkAuth('Para agendar atendimentos externos reais, conecte sua conta do Google.')) return;
     const payload = { ...item, notified: false };
-    if (user) {
-      await addDoc(collection(db, 'appointments'), payload);
-    } else {
-      const newAppt: Appointment = { id: `appt-${Date.now()}`, ...payload };
-      setAppointments(prev => [newAppt, ...prev]);
-    }
+    await addDoc(collection(db, 'appointments'), cleanPayload({ ...payload, ownerId: user.uid }));
   };
 
   const handleDeleteAppointment = async (id: string) => {
-    if (user) {
-      await deleteDoc(doc(db, 'appointments', id));
-    } else {
-      setAppointments(prev => prev.filter(app => app.id !== id));
-    }
+    if (!checkAuth('Para cancelar agendamentos externos reais, conecte sua conta do Google.')) return;
+    await deleteDoc(doc(db, 'appointments', id));
   };
 
   // Save Shop Configuration
   const handleSaveShopConfig = async (updatedConfig: ShopConfig) => {
-    if (user) {
-      await setDoc(doc(db, 'shop_config', 'config'), updatedConfig);
-    } else {
-      localStorage.setItem('infocam_config', JSON.stringify(updatedConfig));
-    }
+    if (!checkAuth('Para salvar configurações reais do sistema, conecte sua conta do Google.')) return;
+    await setDoc(doc(db, 'shop_config', user.uid), cleanPayload(updatedConfig));
     setShopConfig(updatedConfig);
   };
 
   // INTEGRATED RECEIVING FLOW: OS paid and cash register synchronized
   const handleReceiveOSPayment = async (os: ServiceOrder, paymentMethod: 'dinheiro' | 'pix' | 'debito' | 'credito') => {
+    if (!checkAuth('Para receber pagamentos de O.S. no caixa real, conecte sua conta do Google.')) return;
     const transactionPayload: Omit<Transaction, 'id'> = {
       description: `Recebimento O.S. ${os.osNumber} - Cliente: ${os.customerName}`,
       amount: os.totalAmount,
@@ -730,39 +822,23 @@ export default function App() {
       osId: os.id
     };
 
-    if (user) {
-      try {
-        await addDoc(collection(db, 'transactions'), transactionPayload);
-        await updateDoc(doc(db, 'service_orders', os.id), {
-          status: 'entregue',
-          paymentStatus: 'pago',
-          updatedAt: new Date().toISOString()
-        });
-        alert(`Pagamento de ${os.osNumber} recebido com sucesso no Caixa!`);
-      } catch (err) {
-        console.error(err);
-        throw err;
-      }
-    } else {
-      const newTx: Transaction = { id: `tx-${Date.now()}`, ...transactionPayload };
-      setTransactions(prev => [newTx, ...prev]);
-      setServiceOrders(prev => prev.map(item => item.id === os.id ? {
-        ...item,
+    try {
+      await addDoc(collection(db, 'transactions'), cleanPayload({ ...transactionPayload, ownerId: user.uid }));
+      await updateDoc(doc(db, 'service_orders', os.id), cleanPayload({
         status: 'entregue',
         paymentStatus: 'pago',
         updatedAt: new Date().toISOString()
-      } : item));
-      alert(`Pagamento de ${os.osNumber} recebido com sucesso no Caixa Local!`);
+      }));
+      alert(`Pagamento de ${os.osNumber} recebido com sucesso no Caixa!`);
+    } catch (err) {
+      console.error(err);
+      throw err;
     }
   };
 
   const handleAddBackupLog = async (log: Omit<BackupHistory, 'id'>) => {
-    if (user) {
-      await addDoc(collection(db, 'backup_history'), log);
-    } else {
-      const newLog: BackupHistory = { id: `bk-${Date.now()}`, ...log };
-      setBackupHistory(prev => [newLog, ...prev]);
-    }
+    if (!checkAuth('Para registrar logs de backup, conecte sua conta do Google.')) return;
+    await addDoc(collection(db, 'backup_history'), cleanPayload({ ...log, ownerId: user.uid }));
   };
 
   // PDV sale registration logic that decreases product stock automatically
@@ -773,6 +849,7 @@ export default function App() {
     paymentMethod: 'dinheiro' | 'pix' | 'debito' | 'credito';
     total: number;
   }) => {
+    if (!checkAuth('Para registrar vendas reais no PDV, conecte sua conta do Google.')) return;
     const desc = `Venda PDV - ${saleData.items.map(i => `${i.qty}x ${i.product.name}`).join(', ')}`;
     const transactionPayload = {
       description: desc.substring(0, 150) + (desc.length > 150 ? '...' : ''),
@@ -785,32 +862,20 @@ export default function App() {
       technicianId: saleData.technicianId || null
     };
 
-    if (user) {
-      try {
-        const batch = writeBatch(db);
-        const transRef = doc(collection(db, 'transactions'));
-        batch.set(transRef, transactionPayload);
-        saleData.items.forEach(item => {
-          const prodRef = doc(db, 'products', item.product.id);
-          const newStock = Math.max(0, item.product.stock - item.qty);
-          batch.update(prodRef, { stock: newStock });
-        });
-        await batch.commit();
-      } catch (err) {
-        console.error('Erro ao processar venda no PDV:', err);
-        throw err;
-      }
-    } else {
-      const newTx: Transaction = { id: `tx-${Date.now()}`, ...transactionPayload };
-      setTransactions(prev => [newTx, ...prev]);
-      setProducts(prev => prev.map(p => {
-        const saleItem = saleData.items.find(item => item.product.id === p.id);
-        if (saleItem) {
-          return { ...p, stock: Math.max(0, p.stock - saleItem.qty) };
-        }
-        return p;
-      }));
-      alert('Venda registrada localmente com sucesso!');
+    try {
+      const batch = writeBatch(db);
+      const transRef = doc(collection(db, 'transactions'));
+      batch.set(transRef, cleanPayload({ ...transactionPayload, ownerId: user.uid }));
+      saleData.items.forEach(item => {
+        const prodRef = doc(db, 'products', item.product.id);
+        const newStock = Math.max(0, item.product.stock - item.qty);
+        batch.update(prodRef, { stock: newStock });
+      });
+      await batch.commit();
+      alert('Venda registrada no PDV com sucesso!');
+    } catch (err) {
+      console.error('Erro ao processar venda no PDV:', err);
+      throw err;
     }
   };
 
@@ -822,6 +887,8 @@ export default function App() {
       case 'vendas': return <ShoppingBag size={size} />;
       case 'produtos': return <Package size={size} />;
       case 'os': return <Wrench size={size} />;
+      case 'clientes': return <User size={size} />;
+      case 'compras': return <Computer size={size} />;
       case 'agendamentos': return <Calendar size={size} />;
       case 'backup': return <Cloud size={size} />;
       case 'settings_shop': return <Settings size={size} />;
@@ -836,6 +903,8 @@ export default function App() {
       case 'vendas': return 'Vendas (PDV)';
       case 'produtos': return 'Estoque / Produtos';
       case 'os': return 'Ordens de Serviço';
+      case 'clientes': return 'Meus Clientes';
+      case 'compras': return 'Compra de Equipamentos';
       case 'agendamentos': return 'Agendamentos';
       case 'backup': return 'Drive & Backup';
       case 'settings_shop': return 'Configurações';
@@ -1137,6 +1206,27 @@ export default function App() {
 
       {/* Main Content Area */}
       <main className="flex-1 p-6 md:p-8 overflow-y-auto max-w-7xl mx-auto w-full">
+        {!user && (
+          <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4 shadow-sm animate-fade-in">
+            <div className="flex items-center gap-3 text-left">
+              <div className="p-2 bg-amber-100 text-amber-800 rounded-xl shrink-0">
+                <Sparkles size={16} />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-amber-950">Você está no Modo de Demonstração (Sem Conta)</p>
+                <p className="text-[11px] text-amber-800 mt-0.5 leading-relaxed">
+                  Conecte sua conta do Google para carregar o sistema principal, visualizar clientes reais e salvar novos dados de forma integrada.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={handleGoogleSignIn}
+              className="flex items-center gap-2 px-3.5 py-1.5 bg-zinc-950 hover:bg-zinc-850 text-white rounded-xl text-xs font-bold transition-all shadow-sm shrink-0 cursor-pointer"
+            >
+              Conectar Google
+            </button>
+          </div>
+        )}
         <AnimatePresence mode="wait">
           <motion.div
             key={currentTab}
@@ -1182,6 +1272,7 @@ export default function App() {
               <PDV 
                 products={products}
                 staffList={staffList}
+                transactions={transactions}
                 onAddProduct={handleAddProduct}
                 onRegisterSale={handleRegisterSale}
                 shopName={shopConfig.name}
@@ -1214,6 +1305,31 @@ export default function App() {
                 shopLogo={shopConfig.logo}
                 autoSaveOSToDrive={shopConfig.autoSaveOSToDrive}
                 googleToken={token}
+                config={shopConfig}
+                user={user}
+                customers={customers}
+              />
+            )}
+
+            {currentTab === 'clientes' && (
+              <Customers
+                user={user}
+                customers={customers}
+                onAddCustomer={handleAddCustomer}
+                onEditCustomer={handleEditCustomer}
+                onDeleteCustomer={handleDeleteCustomer}
+                onLogin={handleGoogleSignIn}
+              />
+            )}
+
+            {currentTab === 'compras' && (
+              <EquipmentPurchases 
+                purchases={equipmentPurchases}
+                onAddPurchase={handleAddPurchase}
+                onAddTransaction={handleAddTransaction}
+                config={shopConfig}
+                user={user}
+                customers={customers}
               />
             )}
 
@@ -1223,6 +1339,8 @@ export default function App() {
                 staffList={staffList}
                 onAddAppointment={handleAddAppointment}
                 onDeleteAppointment={handleDeleteAppointment}
+                user={user}
+                customers={customers}
               />
             )}
 
@@ -1249,12 +1367,54 @@ export default function App() {
                 staffList={staffList}
                 onAddStaff={handleAddStaff}
                 onDeleteStaff={handleDeleteStaff}
+                transactions={transactions}
+                serviceOrders={serviceOrders}
               />
             )}
           </motion.div>
         </AnimatePresence>
       </main>
 
+      {/* Google Login Restrict Modal */}
+      <AnimatePresence>
+        {showAuthModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-950/40 backdrop-blur-sm animate-fade-in">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              className="w-full max-w-sm bg-white border border-zinc-200 rounded-2xl shadow-xl overflow-hidden p-6 text-center space-y-4"
+            >
+              <div className="w-12 h-12 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center mx-auto">
+                <Lock size={22} />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-sm font-bold text-zinc-950">Acesso Restrito</h3>
+                <p className="text-xs text-zinc-500 leading-relaxed">
+                  {authModalMessage || 'Você precisa conectar sua conta do Google para utilizar este recurso e salvar os seus dados.'}
+                </p>
+              </div>
+              <div className="pt-2 flex flex-col gap-2">
+                <button
+                  onClick={() => {
+                    setShowAuthModal(false);
+                    handleGoogleSignIn();
+                  }}
+                  className="w-full py-2.5 bg-zinc-900 hover:bg-zinc-850 text-white rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer"
+                >
+                  Conectar Conta Google
+                </button>
+                <button
+                  onClick={() => setShowAuthModal(false)}
+                  className="w-full py-2.5 border border-zinc-200 hover:bg-zinc-50 text-zinc-600 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                >
+                  Continuar como Demonstração
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

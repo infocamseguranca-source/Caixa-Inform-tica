@@ -55,6 +55,19 @@ export interface ServiceOrder {
   updatedAt: string;
 }
 
+export interface Customer {
+  id: string;
+  name: string;
+  phone: string;
+  email?: string;
+  address?: string;
+  cpf?: string;
+  birthDate?: string;
+  ownerId?: string; // Google account user.uid
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface BackupHistory {
   id: string;
   fileName: string;
@@ -103,6 +116,37 @@ export interface ShopConfig {
   osStartNumber: number;
   menuOrder: string[]; // List of tab IDs
   autoSaveOSToDrive?: boolean;
+  commissionPassword?: string;
+  finalizationOptions?: string[];
+  purchaseCategories?: string[];
+  purchaseEquipmentTypes?: string[];
+  enablePurchaseSignature?: boolean;
+  nonFiscalPrinterType?: 'none' | 'bluetooth' | 'usb' | 'network';
+  nonFiscalPrinterName?: string;
+  commonPrinterType?: 'none' | 'system' | 'network';
+  commonPrinterName?: string;
+}
+
+export interface EquipmentPurchase {
+  id: string;
+  customerName: string;
+  customerPhone: string;
+  customerCpf: string;
+  documentPhoto?: string; // Base64 dataURL
+  purchaseCategory: string; // Informatica, Celulares, etc.
+  equipmentType: string; // computador, notebook, celular, tablet, monitor, impressora, outros
+  hasPassword?: boolean;
+  passwordType?: 'padrao' | 'pin' | 'escrita' | 'nenhuma';
+  passwordValue?: string;
+  googleAccount?: string;
+  googlePassword?: string;
+  imei?: string;
+  imeiChecked?: boolean;
+  amountPaid: number;
+  paymentMethod: 'dinheiro' | 'pix' | 'debito' | 'credito';
+  signature?: string; // Base64 signature
+  date: string;
+  additionalPasswords?: { type: 'padrao' | 'pin' | 'escrita' | 'nenhuma'; value: string }[];
 }
 
 export interface CashRegisterState {

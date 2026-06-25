@@ -15,22 +15,27 @@ import {
   BellRing,
   X
 } from 'lucide-react';
-import { Appointment, Staff } from '../types';
+import { Appointment, Staff, Customer } from '../types';
 import { formatDate } from '../utils';
 import { motion, AnimatePresence } from 'motion/react';
+import CustomerAutocomplete from './CustomerAutocomplete';
 
 interface AppointmentsProps {
   appointments: Appointment[];
   staffList: Staff[];
   onAddAppointment: (appointment: Omit<Appointment, 'id' | 'notified'>) => Promise<void>;
   onDeleteAppointment: (id: string) => Promise<void>;
+  user: any | null;
+  customers: Customer[];
 }
 
 export default function Appointments({
   appointments,
   staffList,
   onAddAppointment,
-  onDeleteAppointment
+  onDeleteAppointment,
+  user,
+  customers
 }: AppointmentsProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [customerName, setCustomerName] = useState('');
@@ -278,12 +283,17 @@ export default function Appointments({
                 <div className="space-y-3">
                   <div>
                     <label className="block text-xs font-bold text-zinc-500 mb-1">Nome Completo do Cliente</label>
-                    <input
-                      type="text"
+                    <CustomerAutocomplete
                       required
                       value={customerName}
-                      onChange={(e) => setCustomerName(e.target.value)}
-                      className="w-full px-3 py-2 border border-zinc-200 rounded-xl text-xs"
+                      onChange={setCustomerName}
+                      onSelect={(client) => {
+                        setCustomerName(client.name);
+                        if (client.phone) setCustomerPhone(client.phone);
+                        if (client.address) setAddress(client.address);
+                      }}
+                      user={user}
+                      customers={customers}
                       placeholder="Ex: Amanda Gouveia"
                     />
                   </div>

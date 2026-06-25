@@ -26,6 +26,7 @@ interface CashRegisterProps {
   onDeleteTransaction: (id: string) => Promise<void>;
   categories?: string[];
   onExportExcel?: (data: any[], title: string) => void;
+  onNavigateToCompras?: () => void;
 }
 
 const DEFAULT_CATEGORIES = [
@@ -53,7 +54,8 @@ export default function CashRegister({
   onEditTransaction,
   onDeleteTransaction,
   categories = DEFAULT_CATEGORIES,
-  onExportExcel
+  onExportExcel,
+  onNavigateToCompras
 }: CashRegisterProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<'todos' | 'entrada' | 'saida'>('todos');
@@ -482,7 +484,22 @@ export default function CashRegister({
 
                 {/* Description */}
                 <div>
-                  <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1.5">Descrição</label>
+                  <div className="flex justify-between items-center mb-1.5">
+                    <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider">Descrição</label>
+                    {type === 'saida' && onNavigateToCompras && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsModalOpen(false);
+                          onNavigateToCompras();
+                        }}
+                        className="text-[10px] font-black text-emerald-600 hover:text-emerald-700 hover:underline flex items-center gap-1 cursor-pointer transition-colors"
+                        title="Registrar Compra com Contrato de Proteção Legal Completo"
+                      >
+                        🏷️ É Compra de Aparelho? Registrar Completo ➡️
+                      </button>
+                    )}
+                  </div>
                   <input
                     type="text"
                     required
