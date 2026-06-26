@@ -33,7 +33,7 @@ export default function Dashboard({
   
   // Calculate stats
   const totalInflow = transactions
-    .filter(t => t.type === 'entrada')
+    .filter(t => t.type === 'entrada' || t.type === 'abertura_caixa')
     .reduce((acc, curr) => acc + curr.amount, 0);
 
   const totalOutflow = transactions
@@ -58,6 +58,26 @@ export default function Dashboard({
     .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
     .slice(0, 5);
 
+  // Calculate Monthly Pieces Profit
+  const currentMonth = new Date().getMonth();
+  const currentYear = new Date().getFullYear();
+  let monthlyPiecesProfit = 0;
+  
+  transactions.forEach(t => {
+    const d = new Date(t.date);
+    if (d.getMonth() === currentMonth && d.getFullYear() === currentYear) {
+      if (t.items && t.items.length > 0) {
+        t.items.forEach(item => {
+          if (item.product && item.product.costPrice) {
+            const salePrice = item.product.promotionPrice || item.product.price || 0;
+            const profitPerItem = salePrice - item.product.costPrice;
+            monthlyPiecesProfit += profitPerItem * item.qty;
+          }
+        });
+      }
+    }
+  });
+
   // Daily flow data for the last 7 days chart
   const getLast7DaysData = () => {
     const result = [];
@@ -67,7 +87,7 @@ export default function Dashboard({
       const dateStr = d.toISOString().split('T')[0];
       
       const dayInflows = transactions
-        .filter(t => t.type === 'entrada' && t.date.startsWith(dateStr))
+        .filter(t => (t.type === 'entrada' || t.type === 'abertura_caixa') && t.date.startsWith(dateStr))
         .reduce((sum, t) => sum + t.amount, 0);
         
       const dayOutflows = transactions
@@ -91,7 +111,7 @@ export default function Dashboard({
   return (
     <div className="space-y-6">
       {/* Overview Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
         {/* Card Saldo Atual */}
         <motion.div 
           initial={{ opacity: 0, y: 15 }}
@@ -114,11 +134,33 @@ export default function Dashboard({
           </div>
         </motion.div>
 
-        {/* Card Total Entradas */}
+        {/* Card Lucro de Peças (Mês Atual) */}
         <motion.div 
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, delay: 0.05 }}
+          className="bg-indigo-50/50 p-6 rounded-2xl shadow-xs border border-indigo-100 flex flex-col justify-between"
+          id="card-lucro-pecas"
+        >
+          <div className="flex justify-between items-center">
+            <span className="text-sm font-medium text-indigo-900">Lucro de Peças (Mês)</span>
+            <div className="p-2 rounded-xl bg-indigo-100 text-indigo-600">
+              <Activity size={20} />
+            </div>
+          </div>
+          <div className="mt-4">
+            <h3 className="text-2xl font-bold tracking-tight text-indigo-700">
+              {formatCurrency(monthlyPiecesProfit)}
+            </h3>
+            <p className="text-xs text-indigo-400 mt-1">Apenas produtos com custo</p>
+          </div>
+        </motion.div>
+
+        {/* Card Total Entradas */}
+        <motion.div 
+          initial={{ opacity: 0, y: 15 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: 0.1 }}
           className="bg-white p-6 rounded-2xl shadow-xs border border-zinc-100 flex flex-col justify-between"
           id="card-entradas"
         >
@@ -140,7 +182,7 @@ export default function Dashboard({
         <motion.div 
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, delay: 0.1 }}
+          transition={{ duration: 0.3, delay: 0.15 }}
           className="bg-white p-6 rounded-2xl shadow-xs border border-zinc-100 flex flex-col justify-between"
           id="card-saidas"
         >
@@ -162,7 +204,7 @@ export default function Dashboard({
         <motion.div 
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, delay: 0.15 }}
+          transition={{ duration: 0.3, delay: 0.20 }}
           className="bg-white p-6 rounded-2xl shadow-xs border border-zinc-100 flex flex-col justify-between"
           id="card-os"
         >
@@ -321,8 +363,14 @@ export default function Dashboard({
               recentTransactions.map((t) => (
                 <div key={t.id} className="py-3 flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-lg ${t.type === 'entrada' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
-                      {t.type === 'entrada' ? <ArrowUpRight size={16} /> : <ArrowDownRight size={16} />}
+                    <div className={`p-2 rounded-lg ${
+                      t.type === 'entrada' || t.type === 'abertura_caixa' 
+                        ? 'bg-emerald-50 text-emerald-600' 
+                        : t.type === 'fechamento_caixa'
+                          ? 'bg-amber-50 text-amber-600'
+                          : 'bg-rose-50 text-rose-600'
+                    }`}>
+                      {(t.type === 'entrada' || t.type === 'abertura_caixa') ? <ArrowUpRight size={16} /> : <ArrowDownRight size={16} />}
                     </div>
                     <div>
                       <p className="text-sm font-semibold text-zinc-950">{t.description}</p>
@@ -330,12 +378,24 @@ export default function Dashboard({
                         <span className="capitalize">{t.paymentMethod}</span>
                         <span>•</span>
                         <span>{t.category}</span>
+                        {(t.type === 'abertura_caixa' || t.type === 'fechamento_caixa') && (
+                          <>
+                            <span>•</span>
+                            <span className="bg-zinc-100 px-1 py-0.5 rounded text-[9px] font-bold">CAIXA</span>
+                          </>
+                        )}
                       </div>
                     </div>
                   </div>
                   <div className="text-right">
-                    <span className={`text-sm font-bold ${t.type === 'entrada' ? 'text-emerald-600' : 'text-rose-600'}`}>
-                      {t.type === 'entrada' ? '+' : '-'} {formatCurrency(t.amount)}
+                    <span className={`text-sm font-bold ${
+                      t.type === 'entrada' || t.type === 'abertura_caixa' 
+                        ? 'text-emerald-600' 
+                        : t.type === 'fechamento_caixa'
+                          ? 'text-amber-600'
+                          : 'text-rose-600'
+                    }`}>
+                      {t.type === 'entrada' || t.type === 'abertura_caixa' ? '+' : t.type === 'fechamento_caixa' ? '=' : '-'} {formatCurrency(t.amount)}
                     </span>
                     <p className="text-[10px] text-zinc-400 mt-0.5">{formatDate(t.date)}</p>
                   </div>

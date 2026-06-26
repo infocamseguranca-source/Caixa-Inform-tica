@@ -2,14 +2,16 @@ export interface Transaction {
   id: string;
   description: string;
   amount: number;
-  type: 'entrada' | 'saida';
+  type: 'entrada' | 'saida' | 'abertura_caixa' | 'fechamento_caixa';
   category: string;
   paymentMethod: 'dinheiro' | 'pix' | 'debito' | 'credito';
   date: string;
   osId?: string;
   productId?: string;
+  cost?: number;
   sellerId?: string;
   technicianId?: string;
+  items?: { product: Product; qty: number; unitPrice?: number }[];
 }
 
 export type OSStatus = 
@@ -31,9 +33,11 @@ export interface ServiceOrder {
   id: string;
   osNumber: string;
   customerName: string;
+  customerCpfCnpj?: string;
   customerPhone: string;
   customerEmail?: string;
   customerBirthDate?: string;
+  customerAddress?: string;
   deviceName: string;
   deviceType: 'Celular' | 'Tablet' | 'Notebook' | 'Computador' | 'Console' | 'Impressora' | string;
   serialNumber?: string;
@@ -45,7 +49,9 @@ export interface ServiceOrder {
   priceParts: number;
   totalAmount: number;
   paymentStatus: 'pendente' | 'pago';
-  patternLock?: string; // String representation of grid pattern dots, e.g., "1-2-3"
+  patternLock?: string; // Legacy: String representation of grid pattern dots, e.g., "1-2-3"
+  passwordType?: 'pin' | 'padrao' | 'escrita';
+  passwordValue?: string;
   signature?: string; // Base64 dataURL of signature
   photos?: string[]; // Array of Base64 image strings
   partOrder?: PartOrder;
@@ -61,7 +67,7 @@ export interface Customer {
   phone: string;
   email?: string;
   address?: string;
-  cpf?: string;
+  cpfCnpj?: string;
   birthDate?: string;
   ownerId?: string; // Google account user.uid
   createdAt: string;
@@ -81,14 +87,31 @@ export interface Product {
   id: string;
   name: string;
   price: number;
+  costPrice?: number;
   stock: number;
+  type?: string;
+  condition?: 'novo' | 'semi-novo';
+  usageTime?: string;
+  description?: string;
+  createdAt?: string;
+  isPromotion?: boolean;
+  promotionPrice?: number;
 }
 
 export interface Staff {
   id: string;
   name: string;
-  role: 'tecnico' | 'vendedor';
-  commission: number; // Percentage, e.g., 5 for 5%
+  role: 'tecnico' | 'vendedor' | 'ambos' | string;
+  isSeller?: boolean;
+  isTechnician?: boolean;
+  commission: number; // Legacy or general
+  salesCommissionRate?: number;
+  salesCommissionMinLimit?: number;
+  techCommissionRate?: number;
+  techCommissionByType?: { type: string; rate: number }[];
+  targetAmount?: number;
+  targetCommission?: number;
+  password?: string;
 }
 
 export interface Appointment {
@@ -120,7 +143,19 @@ export interface ShopConfig {
   finalizationOptions?: string[];
   purchaseCategories?: string[];
   purchaseEquipmentTypes?: string[];
+  productTypes?: string[];
   enablePurchaseSignature?: boolean;
+  whatsappMessages?: {
+    aguardando?: string;
+    aprovado?: string;
+    em_reparo?: string;
+    pronto?: string;
+    entregue?: string;
+    default?: string;
+    appointment?: string;
+  };
+  whatsappApiToken?: string;
+  whatsappPhoneNumberId?: string;
   nonFiscalPrinterType?: 'none' | 'bluetooth' | 'usb' | 'network';
   nonFiscalPrinterName?: string;
   commonPrinterType?: 'none' | 'system' | 'network';

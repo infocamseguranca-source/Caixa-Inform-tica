@@ -23,138 +23,7 @@ import { formatCurrency, formatDate, formatPhone } from '../utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { jsPDF } from 'jspdf';
 import CustomerAutocomplete from './CustomerAutocomplete';
-
-// Interactive 9-dot Pattern Drawing widget
-const PatternLockWidget = ({ value, onChange }: { value: string; onChange: (val: string) => void }) => {
-  const activeDots = value ? value.split('-').map(Number) : [];
-  const [isDrawing, setIsDrawing] = useState(false);
-
-  const handleDotInteraction = (dotIndex: number) => {
-    if (activeDots.includes(dotIndex)) return;
-    const newDots = [...activeDots, dotIndex];
-    onChange(newDots.join('-'));
-  };
-
-  const handleStart = (dotIndex: number) => {
-    setIsDrawing(true);
-    onChange(dotIndex.toString());
-  };
-
-  const handleEnter = (dotIndex: number) => {
-    if (!isDrawing) return;
-    if (activeDots.includes(dotIndex)) return;
-    const newDots = [...activeDots, dotIndex];
-    onChange(newDots.join('-'));
-  };
-
-  const handleEnd = () => {
-    setIsDrawing(false);
-  };
-
-  const clearPattern = () => {
-    onChange('');
-  };
-
-  const getDotCoords = (idx: number) => {
-    const row = Math.floor((idx - 1) / 3);
-    const col = (idx - 1) % 3;
-    return {
-      x: 35 + col * 70,
-      y: 35 + row * 70
-    };
-  };
-
-  return (
-    <div className="flex flex-col items-center space-y-2 p-3 bg-zinc-50 border border-zinc-200 rounded-xl max-w-xs mx-auto">
-      <div 
-        className="relative w-[210px] h-[210px] bg-white rounded-xl shadow-inner border border-zinc-150 overflow-hidden select-none"
-        onMouseUp={handleEnd}
-        onTouchEnd={handleEnd}
-      >
-        <svg className="absolute inset-0 w-full h-full pointer-events-none">
-          {activeDots.map((dotIdx, i) => {
-            if (i === 0) return null;
-            const prev = getDotCoords(activeDots[i - 1]);
-            const curr = getDotCoords(dotIdx);
-            return (
-              <line
-                key={i}
-                x1={prev.x}
-                y1={prev.y}
-                x2={curr.x}
-                y2={curr.y}
-                stroke="#10b981"
-                strokeWidth="4"
-                strokeLinecap="round"
-              />
-            );
-          })}
-        </svg>
-
-        <div className="absolute inset-0 grid grid-cols-3 grid-rows-3 p-4 gap-4">
-          {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((idx) => {
-            const isActive = activeDots.includes(idx);
-            const order = activeDots.indexOf(idx) + 1;
-            return (
-              <div
-                key={idx}
-                onMouseDown={() => handleStart(idx)}
-                onMouseEnter={() => handleEnter(idx)}
-                onTouchStart={(e) => {
-                  e.preventDefault();
-                  handleStart(idx);
-                }}
-                onTouchMove={(e) => {
-                  const touch = e.touches[0];
-                  const element = document.elementFromPoint(touch.clientX, touch.clientY);
-                  if (element) {
-                    const dataIdx = element.getAttribute('data-dot-index');
-                    if (dataIdx) {
-                      const dotIdx = parseInt(dataIdx);
-                      if (!isNaN(dotIdx) && !activeDots.includes(dotIdx)) {
-                        onChange([...activeDots, dotIdx].join('-'));
-                      }
-                    }
-                  }
-                }}
-                onClick={() => handleDotInteraction(idx)}
-                data-dot-index={idx}
-                className="relative flex items-center justify-center cursor-pointer group rounded-full"
-              >
-                <div 
-                  data-dot-index={idx}
-                  className={`w-7 h-7 rounded-full flex items-center justify-center transition-all duration-150 ${
-                    isActive 
-                      ? 'bg-emerald-500 text-white shadow-md scale-110' 
-                      : 'bg-zinc-200 group-hover:bg-zinc-300 scale-100'
-                  }`}
-                >
-                  {isActive ? (
-                    <span data-dot-index={idx} className="text-[10px] font-black">{order}</span>
-                  ) : (
-                    <span data-dot-index={idx} className="text-[8px] text-zinc-400 font-bold">{idx}</span>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-      <div className="flex gap-2 w-full justify-between items-center px-1">
-        <span className="text-[10px] font-black text-zinc-500">
-          Senha Desenho: <span className="font-mono text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded font-black">{value || 'Vazia'}</span>
-        </span>
-        <button
-          type="button"
-          onClick={clearPattern}
-          className="text-[9px] font-black bg-zinc-200 hover:bg-zinc-300 px-2 py-1 rounded text-zinc-700 uppercase"
-        >
-          Limpar
-        </button>
-      </div>
-    </div>
-  );
-};
+import PatternLockWidget from './PatternLockWidget';
 
 interface EquipmentPurchasesProps {
   purchases: EquipmentPurchase[];
@@ -366,120 +235,296 @@ export default function EquipmentPurchases({
         format: 'a4'
       });
 
-      // Shop Header
-      doc.setFont('Helvetica', 'bold');
-      doc.setFontSize(16);
-      doc.text(config.name || 'INFO_CAM TECNOLOGIA', 14, 20);
+      // Helper to convert hex to rgb
+      const hexToRgb = (hexStr: string) => {
+        let hex = hexStr.replace('#', '');
+        if (hex.length === 3) {
+          hex = hex.split('').map(c => c + c).join('');
+        }
+        const r = parseInt(hex.substring(0, 2), 16) || 24;
+        const g = parseInt(hex.substring(2, 4), 16) || 24;
+        const b = parseInt(hex.substring(4, 6), 16) || 27;
+        return { r, g, b };
+      };
 
-      doc.setFontSize(8);
-      doc.setFont('Helvetica', 'normal');
-      doc.text(`Contato: ${config.phone || ''} | CNPJ/CPF: ${config.cnpjCpf || ''}`, 14, 26);
-      doc.text(`Data da Compra: ${new Date(purchase.date).toLocaleString('pt-BR')}`, 14, 31);
+      const primaryHex = config.colors?.primary || '#18181b';
+      const rgb = hexToRgb(primaryHex);
 
-      doc.setFont('Helvetica', 'bold');
-      doc.setFontSize(12);
-      doc.text(`CONTRATO E RECIBO DE COMPRA DE EQUIPAMENTO`, 14, 40);
-      doc.setFontSize(10);
-      doc.text(`Nº COMPRA: ${purchase.id.substring(0, 8).toUpperCase()}`, 130, 40);
+      // --- PAGE BORDER & STYLE ---
+      doc.setDrawColor(228, 228, 231); // Light zinc border
+      doc.rect(10, 10, 190, 277); // Outer frame
 
-      doc.setDrawColor(220, 220, 224);
-      doc.line(14, 44, 196, 44);
+      // --- HEADER ACCENT BAR (Top colored brand bar) ---
+      doc.setFillColor(rgb.r, rgb.g, rgb.b);
+      doc.rect(10, 10, 190, 5, 'F');
 
-      // Client Section
-      doc.setFont('Helvetica', 'bold');
-      doc.text('1. DADOS DO CLIENTE / VENDEDOR', 14, 52);
-      doc.setFont('Helvetica', 'normal');
-      doc.setFontSize(9);
-      doc.text(`Nome: ${purchase.customerName}`, 14, 58);
-      doc.text(`CPF: ${purchase.customerCpf}`, 14, 63);
-      doc.text(`Telefone: ${purchase.customerPhone}`, 14, 68);
-
-      doc.line(14, 74, 196, 74);
-
-      // Equipment Section
-      doc.setFont('Helvetica', 'bold');
-      doc.setFontSize(10);
-      doc.text('2. ESPECIFICACOES DO EQUIPAMENTO', 14, 82);
-      doc.setFont('Helvetica', 'normal');
-      doc.setFontSize(9);
-      doc.text(`Categoria: ${purchase.purchaseCategory}`, 14, 88);
-      doc.text(`Equipamento: ${purchase.equipmentType}`, 14, 93);
-      if (purchase.imei) {
-        doc.text(`IMEI do Aparelho: ${purchase.imei}`, 14, 98);
-        doc.text(`Checado em ConsultaAparelhoImpedido: ${purchase.imeiChecked ? 'SIM / REGULAR' : 'NÃO CHECADO'}`, 14, 103);
+      // --- SHOP LOGO OR TYPOGRAPHY HEADER ---
+      if (config.logo && config.logo.trim().startsWith('data:image')) {
+        try {
+          doc.addImage(config.logo, 'PNG', 15, 18, 20, 20);
+          doc.setFont('Helvetica', 'bold');
+          doc.setFontSize(14);
+          doc.setTextColor(30, 30, 30);
+          doc.text(config.name || 'INFO_CAM TECNOLOGIA', 39, 23);
+          
+          doc.setFont('Helvetica', 'normal');
+          doc.setFontSize(8);
+          doc.setTextColor(100, 100, 100);
+          doc.text(`CNPJ/CPF: ${config.cnpjCpf || 'N/A'}`, 39, 28);
+          doc.text(`Contato: ${formatPhone(config.phone || '')} | Email: ${config.email || 'N/A'}`, 39, 33);
+        } catch (logoErr) {
+          console.error("Error drawing logo on Contract PDF, defaulting to text:", logoErr);
+          doc.setFont('Helvetica', 'bold');
+          doc.setFontSize(16);
+          doc.setTextColor(rgb.r, rgb.g, rgb.b);
+          doc.text(config.name || 'INFO_CAM TECNOLOGIA', 15, 24);
+          
+          doc.setFont('Helvetica', 'normal');
+          doc.setFontSize(8);
+          doc.setTextColor(100, 100, 100);
+          doc.text(`CNPJ/CPF: ${config.cnpjCpf || 'N/A'} | Contato: ${formatPhone(config.phone || '')}`, 15, 30);
+          doc.text(`Email: ${config.email || 'N/A'}`, 15, 35);
+        }
       } else {
-        doc.text(`Número de Série / Identificação: N/A`, 14, 98);
-      }
-
-      // Passwords Section
-      let nextY = 112;
-      if (purchase.hasPassword || (purchase.additionalPasswords && purchase.additionalPasswords.length > 0)) {
         doc.setFont('Helvetica', 'bold');
-        doc.text('3. SENHAS E CONTAS REGISTRADAS', 14, nextY);
+        doc.setFontSize(16);
+        doc.setTextColor(rgb.r, rgb.g, rgb.b);
+        doc.text(config.name || 'INFO_CAM TECNOLOGIA', 15, 24);
+        
         doc.setFont('Helvetica', 'normal');
-        nextY += 6;
-        if (purchase.hasPassword && purchase.passwordValue) {
-          doc.text(`Senha Principal (${purchase.passwordType?.toUpperCase()}): ${purchase.passwordValue}`, 14, nextY);
-          nextY += 5;
-        }
-        if (purchase.additionalPasswords && purchase.additionalPasswords.length > 0) {
-          purchase.additionalPasswords.forEach((pwd, idx) => {
-            doc.text(`Senha Adicional ${idx + 2} (${pwd.type.toUpperCase()}): ${pwd.value}`, 14, nextY);
-            nextY += 5;
-          });
-        }
-        if (purchase.googleAccount) {
-          doc.text(`Conta de Segurança (Google/iCloud): ${purchase.googleAccount}`, 14, nextY);
-          nextY += 5;
-          doc.text(`Senha da Conta: ${purchase.googlePassword || 'Não informada'}`, 14, nextY);
-          nextY += 5;
-        }
-        doc.line(14, nextY + 2, 196, nextY + 2);
-        nextY += 10;
+        doc.setFontSize(8);
+        doc.setTextColor(100, 100, 100);
+        doc.text(`CNPJ/CPF: ${config.cnpjCpf || 'N/A'} | Contato: ${formatPhone(config.phone || '')}`, 15, 30);
+        doc.text(`Email: ${config.email || 'N/A'}`, 15, 35);
       }
 
-      // Legal disclaimer terms
+      // --- DOCUMENT METADATA PANEL (Right Header) ---
+      doc.setFillColor(244, 244, 245); // light grey block
+      doc.rect(130, 18, 65, 22, 'F');
+      doc.setDrawColor(212, 212, 216);
+      doc.rect(130, 18, 65, 22);
+
       doc.setFont('Helvetica', 'bold');
       doc.setFontSize(10);
-      doc.text('4. DECLARACAO DE PROPRIEDADE E RESPONSABILIDADE', 14, nextY);
+      doc.setTextColor(30, 30, 30);
+      doc.text(`RECIBO & CONTRATO`, 133, 23);
+      doc.text(`DE COMPRA`, 133, 27);
+      
+      doc.setFontSize(9.5);
+      doc.setTextColor(rgb.r, rgb.g, rgb.b);
+      doc.text(`Nº ${purchase.id.substring(0, 8).toUpperCase()}`, 133, 33);
+
       doc.setFont('Helvetica', 'normal');
+      doc.setFontSize(7);
+      doc.setTextColor(100, 100, 100);
+      doc.text(`Data: ${new Date(purchase.date).toLocaleDateString('pt-BR')}`, 133, 37);
+
+      // --- SECTION BUILDER HELPER ---
+      const drawSectionHeader = (title: string, yPos: number) => {
+        doc.setFillColor(rgb.r, rgb.g, rgb.b);
+        doc.rect(15, yPos, 180, 5.5, 'F');
+        doc.setFont('Helvetica', 'bold');
+        doc.setFontSize(8.5);
+        doc.setTextColor(255, 255, 255);
+        doc.text(title, 18, yPos + 4);
+      };
+
+      // --- CLIENT / SELLER SECTION ---
+      let y = 46;
+      drawSectionHeader('1. DADOS DO CLIENTE VENDEDOR', y);
+      
+      doc.setDrawColor(rgb.r, rgb.g, rgb.b);
+      doc.rect(15, y + 5.5, 180, 20); // Client box
+      
       doc.setFontSize(8);
-      nextY += 6;
-      doc.text('O Vendedor declara, sob as penas da lei, ser o legítimo proprietário e possuidor do equipamento acima descrito, livre', 14, nextY);
-      nextY += 4;
-      doc.text('e desembaraçado de quaisquer ônus, dúvidas, litígios ou pendências financeiras e judiciais, responsabilizando-se civil', 14, nextY);
-      nextY += 4;
-      doc.text('e criminalmente pela autenticidade destas declarações e idoneidade de procedência do aparelho.', 14, nextY);
-      nextY += 6;
-
-      doc.line(14, nextY, 196, nextY);
-      nextY += 8;
-
-      // Values
+      doc.setTextColor(80, 80, 80);
       doc.setFont('Helvetica', 'bold');
-      doc.setFontSize(11);
-      doc.text(`VALOR PAGO: ${formatCurrency(purchase.amountPaid)} via ${purchase.paymentMethod.toUpperCase()}`, 14, nextY);
-      nextY += 15;
-
-      // Signatures
-      doc.setDrawColor(180, 180, 180);
-      doc.line(20, nextY + 15, 90, nextY + 15);
+      doc.text('Nome Completo:', 18, y + 10.5);
       doc.setFont('Helvetica', 'normal');
+      doc.setTextColor(30, 30, 30);
+      doc.text(purchase.customerName, 42, y + 10.5);
+
+      doc.setTextColor(80, 80, 80);
+      doc.setFont('Helvetica', 'bold');
+      doc.text('CPF:', 18, y + 15.5);
+      doc.setFont('Helvetica', 'normal');
+      doc.setTextColor(30, 30, 30);
+      doc.text(purchase.customerCpf || 'N/A', 26, y + 15.5);
+
+      doc.setTextColor(80, 80, 80);
+      doc.setFont('Helvetica', 'bold');
+      doc.text('Telefone/WhatsApp:', 105, y + 15.5);
+      doc.setFont('Helvetica', 'normal');
+      doc.setTextColor(30, 30, 30);
+      doc.text(formatPhone(purchase.customerPhone), 133, y + 15.5);
+
+      // --- EQUIPMENT SECTION ---
+      y = 75;
+      drawSectionHeader('2. ESPECIFICAÇÕES DO APARELHO ADQUIRIDO', y);
+      
+      doc.rect(15, y + 5.5, 180, 22); // Equipment box
+      
       doc.setFontSize(8);
-      doc.text('Assinatura do Vendedor / Cliente', 25, nextY + 19);
+      doc.setTextColor(80, 80, 80);
+      doc.setFont('Helvetica', 'bold');
+      doc.text('Categoria:', 18, y + 10.5);
+      doc.setFont('Helvetica', 'normal');
+      doc.setTextColor(30, 30, 30);
+      doc.text(purchase.purchaseCategory, 33, y + 10.5);
+
+      doc.setTextColor(80, 80, 80);
+      doc.setFont('Helvetica', 'bold');
+      doc.text('Equipamento:', 18, y + 15.5);
+      doc.setFont('Helvetica', 'normal');
+      doc.setTextColor(30, 30, 30);
+      doc.text(purchase.equipmentType, 38, y + 15.5);
+
+      if (purchase.imei) {
+        doc.setTextColor(80, 80, 80);
+        doc.setFont('Helvetica', 'bold');
+        doc.text('Nº de Série / IMEI:', 105, y + 10.5);
+        doc.setFont('Helvetica', 'normal');
+        doc.setTextColor(30, 30, 30);
+        doc.text(purchase.imei, 131, y + 10.5);
+
+        doc.setTextColor(80, 80, 80);
+        doc.setFont('Helvetica', 'bold');
+        doc.text('Situação Impedido (ANATEL):', 105, y + 15.5);
+        doc.setFont('Helvetica', 'bold');
+        doc.setTextColor(22, 101, 52); // green
+        doc.text(purchase.imeiChecked ? 'SIM / REGULAR E SEM RESTRIÇÃO' : 'NÃO VERIFICADO', 148, y + 15.5);
+      } else {
+        doc.setTextColor(80, 80, 80);
+        doc.setFont('Helvetica', 'bold');
+        doc.text('Nº de Série / Identificação:', 105, y + 10.5);
+        doc.setFont('Helvetica', 'normal');
+        doc.setTextColor(30, 30, 30);
+        doc.text('N/A', 145, y + 10.5);
+      }
+
+      // --- PASSWORDS & SEGURITY SECTION ---
+      let showPasswords = purchase.hasPassword || (purchase.additionalPasswords && purchase.additionalPasswords.length > 0) || purchase.googleAccount;
+      let nextY = 106;
+      if (showPasswords) {
+        drawSectionHeader('3. SENHAS E CONTAS DE SEGURANÇA REGISTRADAS', nextY);
+        
+        doc.rect(15, nextY + 5.5, 180, 24); // Password box
+        
+        let py = nextY + 10.5;
+        doc.setFontSize(8);
+        
+        if (purchase.hasPassword && purchase.passwordValue) {
+          doc.setTextColor(80, 80, 80);
+          doc.setFont('Helvetica', 'bold');
+          doc.text(`Senha Principal (${purchase.passwordType?.toUpperCase()}):`, 18, py);
+          doc.setFont('Helvetica', 'normal');
+          doc.setTextColor(190, 24, 24); // red text to find passwords quickly
+          doc.text(purchase.passwordValue, 65, py);
+          py += 5;
+        }
+
+        if (purchase.googleAccount) {
+          doc.setTextColor(80, 80, 80);
+          doc.setFont('Helvetica', 'bold');
+          doc.text(`Conta de Segurança (iCloud/Gmail):`, 18, py);
+          doc.setFont('Helvetica', 'normal');
+          doc.setTextColor(30, 30, 30);
+          doc.text(purchase.googleAccount, 68, py);
+
+          doc.setTextColor(80, 80, 80);
+          doc.setFont('Helvetica', 'bold');
+          doc.text(`Senha da Conta:`, 105, py);
+          doc.setFont('Helvetica', 'normal');
+          doc.setTextColor(190, 24, 24);
+          doc.text(purchase.googlePassword || 'Não informada', 130, py);
+          py += 5;
+        }
+
+        if (purchase.additionalPasswords && purchase.additionalPasswords.length > 0) {
+          const names = purchase.additionalPasswords.map(p => `${p.type.toUpperCase()}: ${p.value}`).join(' | ');
+          doc.setTextColor(80, 80, 80);
+          doc.setFont('Helvetica', 'bold');
+          doc.text('Outras Senhas:', 18, py);
+          doc.setFont('Helvetica', 'normal');
+          doc.setTextColor(30, 30, 30);
+          doc.text(names, 42, py, { maxWidth: 148 });
+        }
+        
+        nextY += 34;
+      } else {
+        nextY += 4;
+      }
+
+      // --- LEGAL DISCLAIMER AND DECLARATION ---
+      drawSectionHeader('4. DECLARAÇÃO DE PROPRIEDADE E RESPONSABILIDADE', nextY);
+      
+      doc.setFillColor(252, 252, 253);
+      doc.rect(15, nextY + 5.5, 180, 26, 'F');
+      doc.rect(15, nextY + 5.5, 180, 26);
+      
+      doc.setFontSize(7);
+      doc.setFont('Helvetica', 'normal');
+      doc.setTextColor(100, 100, 100);
+      let tyPos = nextY + 10.5;
+      doc.text('O Vendedor declara, sob as penas da lei, ser o legítimo proprietário e possuidor do equipamento acima descrito, livre e', 18, tyPos);
+      doc.text('desembaraçado de quaisquer ônus, dúvidas, litígios ou pendências financeiras e judiciais, responsabilizando-se civil e', 18, tyPos + 4);
+      doc.text('criminalmente pela autenticidade destas declarações e idoneidade de procedência do aparelho. O vendedor declara estar', 18, tyPos + 8);
+      doc.text('ciente que a comercialização de produtos furtados, roubados ou de procedência ilícita configura crime de receptação.', 18, tyPos + 12);
+
+      if (purchase.imeiChecked) {
+        doc.setFont('Helvetica', 'bold');
+        doc.setTextColor(22, 101, 52);
+        doc.text('EQUIPAMENTO CHECADO E VALIDADO CONTRA RESTRIÇÕES / BLOQUEIOS DE FURTO / PERDA (ANATEL).', 18, tyPos + 18);
+      }
+
+      nextY += 36;
+
+      // --- VALUES ---
+      doc.setFillColor(248, 250, 252); // slate bg
+      doc.rect(15, nextY, 180, 14, 'F');
+      doc.rect(15, nextY, 180, 14);
+
+      doc.setFontSize(9.5);
+      doc.setFont('Helvetica', 'bold');
+      doc.setTextColor(rgb.r, rgb.g, rgb.b);
+      doc.text(`VALOR PAGO: ${formatCurrency(purchase.amountPaid)}`, 18, nextY + 8.5);
+
+      doc.setFontSize(8.5);
+      doc.setTextColor(80, 80, 80);
+      doc.text(`Forma de Pagamento: ${purchase.paymentMethod.toUpperCase()}`, 115, nextY + 8.5);
+
+      nextY += 24;
+
+      // --- SIGNATURES ---
+      doc.setDrawColor(180, 180, 180);
+      
+      // Client/Seller Line
+      doc.line(25, nextY + 14, 90, nextY + 14);
+      doc.setFont('Helvetica', 'bold');
+      doc.setFontSize(7.5);
+      doc.setTextColor(80, 80, 80);
+      doc.text('Assinatura do Vendedor (Cliente)', 38, nextY + 18);
 
       if (purchase.signature) {
         try {
-          doc.addImage(purchase.signature, 'PNG', 30, nextY - 5, 40, 18);
+          doc.addImage(purchase.signature, 'PNG', 35, nextY - 1, 40, 14);
         } catch (sigErr) {
           console.error('Erro ao adicionar assinatura ao PDF:', sigErr);
         }
       }
 
-      doc.line(110, nextY + 15, 180, nextY + 15);
-      doc.text('Pela Empresa (Compradora)', 120, nextY + 19);
+      // Company Line
+      doc.line(120, nextY + 14, 185, nextY + 14);
+      doc.text('Pela Empresa (INFO_CAM)', 138, nextY + 18);
 
-      doc.save(`Contrato_Compra_${purchase.customerName.replace(/\s+/g, '_')}.pdf`);
+      // Footer
+      doc.setFont('Helvetica', 'normal');
+      doc.setFontSize(6.5);
+      doc.setTextColor(150, 150, 150);
+      doc.text(`Documento emitido em ${new Date(purchase.date).toLocaleString('pt-BR')}`, 15, 272);
+
+      // Save PDF
+      doc.save(`Recibo_Compra_${purchase.customerName.replace(/\s+/g, '_')}.pdf`);
     } catch (err) {
       console.error('Erro ao gerar PDF da compra:', err);
     }
@@ -786,7 +831,7 @@ export default function EquipmentPurchases({
                           onSelect={(client) => {
                             setCustomerName(client.name);
                             if (client.phone) setCustomerPhone(client.phone);
-                            if (client.cpf) setCustomerCpf(client.cpf);
+                            if (client.cpfCnpj) setCustomerCpf(client.cpfCnpj);
                           }}
                           user={user}
                           customers={customers}

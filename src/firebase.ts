@@ -7,7 +7,7 @@ import {
   User, 
   signOut 
 } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import { initializeFirestore } from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
 
 // Initialize Firebase App
@@ -17,15 +17,17 @@ const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 
 // Initialize Firestore
-export const db = getFirestore(app, (firebaseConfig as any).firestoreDatabaseId);
+export const db = initializeFirestore(app, {
+  experimentalForceLongPolling: true
+}, (firebaseConfig as any).firestoreDatabaseId || "ai-studio-controledecaixa-0e475161-1a25-47f5-9951-9c93649e7cf4");
 
 // Google Auth Provider
 const provider = new GoogleAuthProvider();
 // Add required scope for Google Drive backups
 provider.addScope('https://www.googleapis.com/auth/drive.file');
 
-// Cache the access token in memory
-let cachedAccessToken: string | null = null;
+// Cache the access token in memory or localStorage for persistence across reloads
+let cachedAccessToken: string | null = typeof window !== 'undefined' ? localStorage.getItem('google_drive_access_token') : null;
 let isSigningIn = false;
 
 // Initialize auth state listener. Call this on app load.
@@ -60,6 +62,9 @@ export const googleSignIn = async (): Promise<{ user: User; accessToken: string 
     }
 
     cachedAccessToken = credential.accessToken;
+    if (typeof window !== 'undefined' && cachedAccessToken) {
+      localStorage.setItem('google_drive_access_token', cachedAccessToken);
+    }
     return { user: result.user, accessToken: cachedAccessToken };
   } catch (error: any) {
     console.error('Sign in error:', error);
@@ -78,4 +83,7 @@ export const getAccessToken = async (): Promise<string | null> => {
 export const logout = async () => {
   await signOut(auth);
   cachedAccessToken = null;
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem('google_drive_access_token');
+  }
 };

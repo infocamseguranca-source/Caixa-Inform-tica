@@ -1,0 +1,2747 @@
+[
+  {
+    "description": "CAIXA (Abertura)",
+    "amount": 94.8,
+    "type": "abertura_caixa",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-01T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "café",
+    "amount": 19.65,
+    "type": "saida",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-01T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "CARREGADOR COMPLETO TIPO C",
+    "amount": 60,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "pix",
+    "date": "2026-06-01T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "mouse c/ fio",
+    "amount": 15,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "debito",
+    "date": "2026-06-01T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "IMPRESSÃO",
+    "amount": 3,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-01T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "PELICULA DE HIDROGEL",
+    "amount": 30,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "credito",
+    "date": "2026-06-01T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "CAPAS",
+    "amount": 50,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "credito",
+    "date": "2026-06-01T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "OS6473",
+    "amount": 280,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "credito",
+    "date": "2026-06-01T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "CARREGADOR VEICULAR",
+    "amount": 50,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "debito",
+    "date": "2026-06-01T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "DESBLOQUEIO GRAN PRIME",
+    "amount": 70,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "pix",
+    "date": "2026-06-01T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "OS 6484",
+    "amount": 50,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "debito",
+    "date": "2026-06-01T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "PLACA MÃE",
+    "amount": 400,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "pix",
+    "date": "2026-06-01T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "CAIXA (Abertura)",
+    "amount": 78.15,
+    "type": "abertura_caixa",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-02T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "pão",
+    "amount": 8.6,
+    "type": "saida",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-02T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "carregador tipo c",
+    "amount": 45,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-02T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "pelicula hidrogel",
+    "amount": 30,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "pix",
+    "date": "2026-06-02T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "power bank",
+    "amount": 75,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "credito",
+    "date": "2026-06-02T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "impressão",
+    "amount": 1,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-02T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "PAPEL A4",
+    "amount": 11,
+    "type": "saida",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-02T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "cabo auxiliar",
+    "amount": 15,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-02T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "CAIXINHA DE SOM",
+    "amount": 60,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-02T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "pelicula hidrogel",
+    "amount": 30,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "credito",
+    "date": "2026-06-02T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "PGTO BIA",
+    "amount": 80,
+    "type": "saida",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-02T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "CAIXA (Abertura)",
+    "amount": 146.65,
+    "type": "abertura_caixa",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-03T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "impressão",
+    "amount": 1,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-03T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "SAIDA",
+    "amount": 60,
+    "type": "saida",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-03T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "VINICIUS PIX",
+    "amount": 60,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "pix",
+    "date": "2026-06-03T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "PELICULA HIDROGEL",
+    "amount": 30,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "debito",
+    "date": "2026-06-03T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "impressão",
+    "amount": 3,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "debito",
+    "date": "2026-06-03T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "caixinha de som",
+    "amount": 45,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "pix",
+    "date": "2026-06-03T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "carregador tipo c",
+    "amount": 50,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "debito",
+    "date": "2026-06-03T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "cabo iphone",
+    "amount": 20,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "debito",
+    "date": "2026-06-03T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "impressão",
+    "amount": 2,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-03T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "atelier 55 ssd",
+    "amount": 350,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "pix",
+    "date": "2026-06-03T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "os 6486",
+    "amount": 100,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-03T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "CABO VGA",
+    "amount": 25,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "pix",
+    "date": "2026-06-03T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "CAPA",
+    "amount": 20,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "debito",
+    "date": "2026-06-03T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "PC MARCUS",
+    "amount": 250,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "pix",
+    "date": "2026-06-03T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "pilha aaa",
+    "amount": 5,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "pix",
+    "date": "2026-06-03T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "os 6490 entrada",
+    "amount": 50,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-03T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "pagamento bia",
+    "amount": 80,
+    "type": "saida",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-03T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "CAIXA (Abertura)",
+    "amount": 1,
+    "type": "abertura_caixa",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-04T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "CAIXA (Abertura)",
+    "amount": 169.95,
+    "type": "abertura_caixa",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-05T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "CAFÉ",
+    "amount": 39.4,
+    "type": "saida",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-05T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "SUPORTE DE CELULAR",
+    "amount": 35,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "debito",
+    "date": "2026-06-05T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "CABO HDMI",
+    "amount": 20,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "debito",
+    "date": "2026-06-05T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "carregador iphone",
+    "amount": 50,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "debito",
+    "date": "2026-06-05T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "os6489",
+    "amount": 240,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "debito",
+    "date": "2026-06-05T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "os6491",
+    "amount": 450,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "credito",
+    "date": "2026-06-05T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": ".",
+    "amount": 160,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "credito",
+    "date": "2026-06-05T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "capa",
+    "amount": 20,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "credito",
+    "date": "2026-06-05T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "bateria 2016",
+    "amount": 20,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "debito",
+    "date": "2026-06-05T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "carregador tipo c",
+    "amount": 35,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "pix",
+    "date": "2026-06-05T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "cabo cat7",
+    "amount": 45,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "debito",
+    "date": "2026-06-05T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "os6488",
+    "amount": 200,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "pix",
+    "date": "2026-06-05T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "CABO DE REDE CAT 7",
+    "amount": 45,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "debito",
+    "date": "2026-06-05T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "PELICULA HIDRO",
+    "amount": 30,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-05T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "DIF MONITOR",
+    "amount": 250,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "pix",
+    "date": "2026-06-05T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "CABO IPHONE",
+    "amount": 20,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "debito",
+    "date": "2026-06-05T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "MOUSE + MOUSEPAD",
+    "amount": 30,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "credito",
+    "date": "2026-06-05T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "carregador tipo c",
+    "amount": 15,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "pix",
+    "date": "2026-06-05T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "os6492",
+    "amount": 220,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "pix",
+    "date": "2026-06-05T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "pgto bia",
+    "amount": 60,
+    "type": "saida",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-05T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "falta",
+    "amount": 0.9,
+    "type": "saida",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-05T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "CAIXA (Abertura)",
+    "amount": 99.65,
+    "type": "abertura_caixa",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-07T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "pelicula hidrogel",
+    "amount": 30,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-07T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "manutenção de fio",
+    "amount": 35,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "credito",
+    "date": "2026-06-07T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "xbox one",
+    "amount": 1300,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "debito",
+    "date": "2026-06-07T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "adaptador de rede",
+    "amount": 90,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "pix",
+    "date": "2026-06-07T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "remoção de virus",
+    "amount": 30,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-07T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "impressão",
+    "amount": 6.75,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-07T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "os6494",
+    "amount": 220,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "debito",
+    "date": "2026-06-07T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "os8366",
+    "amount": 160,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "credito",
+    "date": "2026-06-07T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "pagamento bia",
+    "amount": 100,
+    "type": "saida",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-07T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "CAIXA (Abertura)",
+    "amount": 66.4,
+    "type": "abertura_caixa",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-08T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "impressão",
+    "amount": 5,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "credito",
+    "date": "2026-06-08T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "bateria cr2032",
+    "amount": 7,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-08T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "CABO DE REDE",
+    "amount": 25,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "pix",
+    "date": "2026-06-08T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "CABO IPHONE",
+    "amount": 20,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-08T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "CAPA",
+    "amount": 35,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "credito",
+    "date": "2026-06-08T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "CAPA+ PELICULA HIDROGEL + SUPORTE PARA CARRO",
+    "amount": 90,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-08T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "CABO P2/P2",
+    "amount": 20,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "credito",
+    "date": "2026-06-08T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "os6495",
+    "amount": 220,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-08T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "PELICULA 3D",
+    "amount": 10,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-08T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "COMPRA E20",
+    "amount": 50,
+    "type": "saida",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-08T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "OS6496",
+    "amount": 260,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-08T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "PELICULA VIDRO",
+    "amount": 10,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-08T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "capa",
+    "amount": 20,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "credito",
+    "date": "2026-06-08T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "fone",
+    "amount": 70,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-08T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "fone",
+    "amount": 15,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "pix",
+    "date": "2026-06-08T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "colagem de tampa",
+    "amount": 30,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "pix",
+    "date": "2026-06-08T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "pgto bia",
+    "amount": 80,
+    "type": "saida",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-08T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "CAIXA (Abertura)",
+    "amount": 73.4,
+    "type": "abertura_caixa",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-09T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "café",
+    "amount": 23.75,
+    "type": "saida",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-09T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "impressão",
+    "amount": 1,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "pix",
+    "date": "2026-06-09T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "fonte tv box",
+    "amount": 20,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "debito",
+    "date": "2026-06-09T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "carregador iphone",
+    "amount": 25,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "credito",
+    "date": "2026-06-09T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "caixinha",
+    "amount": 10,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-09T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "PELICULA HIDROGEL",
+    "amount": 30,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "credito",
+    "date": "2026-06-09T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "OS8363",
+    "amount": 400,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "pix",
+    "date": "2026-06-09T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "REDMI A12",
+    "amount": 350,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "credito",
+    "date": "2026-06-09T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "fone",
+    "amount": 40,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "pix",
+    "date": "2026-06-09T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "impressão",
+    "amount": 1,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-09T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "OS 6502",
+    "amount": 240,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "pix",
+    "date": "2026-06-09T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "CAIXA (Abertura)",
+    "amount": 60.65,
+    "type": "abertura_caixa",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-10T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "fone sem fio",
+    "amount": 80,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "debito",
+    "date": "2026-06-10T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "pelicula hidrogel",
+    "amount": 30,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "credito",
+    "date": "2026-06-10T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "Celular A17",
+    "amount": 850,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "credito",
+    "date": "2026-06-10T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "os6503+ 2 baterias 2032",
+    "amount": 70,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "debito",
+    "date": "2026-06-10T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "capa",
+    "amount": 20,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "debito",
+    "date": "2026-06-10T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "os6501",
+    "amount": 120,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-10T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "chip claro",
+    "amount": 30,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "credito",
+    "date": "2026-06-10T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "pelicula vidro",
+    "amount": 10,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-10T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "fone sem fio",
+    "amount": 15,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "pix",
+    "date": "2026-06-10T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "impressão",
+    "amount": 5,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-10T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "impressão",
+    "amount": 1,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-10T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "pelicula + capa",
+    "amount": 50,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-10T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "pelicula hidrogel",
+    "amount": 30,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-10T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "suporte para carro",
+    "amount": 25,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-10T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "impressão",
+    "amount": 7,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-10T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "pelicula hidrogel",
+    "amount": 30,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "debito",
+    "date": "2026-06-10T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "pagamento bia",
+    "amount": 80,
+    "type": "saida",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-10T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "CAIXA (Abertura)",
+    "amount": 108.65,
+    "type": "abertura_caixa",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-11T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "pão",
+    "amount": 3.4,
+    "type": "saida",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-11T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "celular a02",
+    "amount": 300,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "pix",
+    "date": "2026-06-11T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "celular redmi note 13",
+    "amount": 1000,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "pix",
+    "date": "2026-06-11T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "dell usado",
+    "amount": 1700,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "pix",
+    "date": "2026-06-11T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "serviço pc wizzard",
+    "amount": 275,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "pix",
+    "date": "2026-06-11T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "os6507",
+    "amount": 40,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-11T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "PELICULA HIDROGEL",
+    "amount": 30,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "credito",
+    "date": "2026-06-11T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "fone",
+    "amount": 15,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-11T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "cabo iphone",
+    "amount": 15,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-11T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "cabo impressora",
+    "amount": 25,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-11T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "PELICULA HIDROGEL",
+    "amount": 30,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-11T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "OS 6508",
+    "amount": 250,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "credito",
+    "date": "2026-06-11T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "PELICULA HIDROGEL",
+    "amount": 30,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "pix",
+    "date": "2026-06-11T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "os6506",
+    "amount": 140,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-11T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "PELICULA HIDROGEL",
+    "amount": 30,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "debito",
+    "date": "2026-06-11T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "carregador portátil",
+    "amount": 90,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "credito",
+    "date": "2026-06-11T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "os8295",
+    "amount": 1400,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "credito",
+    "date": "2026-06-11T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "cabo iphone",
+    "amount": 15,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "pix",
+    "date": "2026-06-11T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "os6490",
+    "amount": 400,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "debito",
+    "date": "2026-06-11T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "celular A05",
+    "amount": 350,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "credito",
+    "date": "2026-06-11T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "celular A05 restante",
+    "amount": 135,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "pix",
+    "date": "2026-06-11T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "pagamento bia",
+    "amount": 80,
+    "type": "saida",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-11T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "CAIXA (Abertura)",
+    "amount": 120.25,
+    "type": "abertura_caixa",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-12T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "café",
+    "amount": 14.4,
+    "type": "saida",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-12T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "impressão",
+    "amount": 4,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "debito",
+    "date": "2026-06-12T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "papel de etiqueta",
+    "amount": 6,
+    "type": "saida",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-12T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "bateria 2032",
+    "amount": 10,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-12T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "PELICULA 3D",
+    "amount": 10,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "pix",
+    "date": "2026-06-12T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "REMOÇÃO DE VIRUS",
+    "amount": 40,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-12T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "CABO TIPO C",
+    "amount": 35,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "pix",
+    "date": "2026-06-12T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "celular edge 30 + troca de tela",
+    "amount": 1000,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "pix",
+    "date": "2026-06-12T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "saida",
+    "amount": 20,
+    "type": "saida",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-12T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "pagamento bia",
+    "amount": 80,
+    "type": "saida",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-12T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "cabo p2",
+    "amount": 15,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "pix",
+    "date": "2026-06-12T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "CAIXA (Abertura)",
+    "amount": 49.85,
+    "type": "abertura_caixa",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-14T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "café",
+    "amount": 10,
+    "type": "saida",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-14T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "os6509",
+    "amount": 100,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "pix",
+    "date": "2026-06-14T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "carregador tipo c",
+    "amount": 45,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "pix",
+    "date": "2026-06-14T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "serviço extra",
+    "amount": 20,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "debito",
+    "date": "2026-06-14T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "ANTENA DIGITAL",
+    "amount": 50,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-14T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "desinfetante",
+    "amount": 6.99,
+    "type": "saida",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-14T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "pelicula+ capa+ bateria 2032",
+    "amount": 60,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "pix",
+    "date": "2026-06-14T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "capa",
+    "amount": 45,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "credito",
+    "date": "2026-06-14T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "cabo hdmi",
+    "amount": 20,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "debito",
+    "date": "2026-06-14T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "fonte atx",
+    "amount": 100,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-14T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "carregador iphone",
+    "amount": 110,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "credito",
+    "date": "2026-06-14T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "cabo de rede",
+    "amount": 40,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "debito",
+    "date": "2026-06-14T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "pagamento bia",
+    "amount": 80,
+    "type": "saida",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-14T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "CAIXA (Abertura)",
+    "amount": 102.85,
+    "type": "abertura_caixa",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-15T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "DIFER. MOTO G05",
+    "amount": 680,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "pix",
+    "date": "2026-06-15T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "CAFÉ",
+    "amount": 10.9,
+    "type": "saida",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-15T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "REMOÇÃO DE VIRUS",
+    "amount": 40,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-15T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "CABO TIPO C PRA LIGHTNING",
+    "amount": 25,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "credito",
+    "date": "2026-06-15T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "IMPRESSÃO",
+    "amount": 1,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-15T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "PELICULA DE GEL",
+    "amount": 30,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-15T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "PELICULA DE GEL",
+    "amount": 30,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "pix",
+    "date": "2026-06-15T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "CAPA",
+    "amount": 20,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "credito",
+    "date": "2026-06-15T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "PELICULA 3D DE PRIVACIDADE",
+    "amount": 30,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "debito",
+    "date": "2026-06-15T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "IMPRESSÃO",
+    "amount": 10,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-15T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "SUPORTE CARRO",
+    "amount": 45,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "pix",
+    "date": "2026-06-15T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "impressão",
+    "amount": 1,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-15T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "POWERBRANK",
+    "amount": 100,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "credito",
+    "date": "2026-06-15T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "CAIXA (Abertura)",
+    "amount": 173.95,
+    "type": "abertura_caixa",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-16T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "café",
+    "amount": 8,
+    "type": "saida",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-16T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "carregador iphone",
+    "amount": 40,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "debito",
+    "date": "2026-06-16T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "capa",
+    "amount": 20,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "debito",
+    "date": "2026-06-16T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "troca botão power",
+    "amount": 90,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-16T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "os8374",
+    "amount": 450,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "credito",
+    "date": "2026-06-16T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "notebook samsung+ instalação sistema",
+    "amount": 880,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "debito",
+    "date": "2026-06-16T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "troca do flex de carga",
+    "amount": 100,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "debito",
+    "date": "2026-06-16T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "OS6511",
+    "amount": 220,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "pix",
+    "date": "2026-06-16T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "cabo usb 2.0",
+    "amount": 20,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "debito",
+    "date": "2026-06-16T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "cabo de rede",
+    "amount": 20,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-16T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "os6513",
+    "amount": 70,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "debito",
+    "date": "2026-06-16T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "pelicula hidrogel",
+    "amount": 30,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "credito",
+    "date": "2026-06-16T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "carregador iphone",
+    "amount": 50,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "pix",
+    "date": "2026-06-16T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "pagamento bia",
+    "amount": 80,
+    "type": "saida",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-16T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "NOTE VENDA",
+    "amount": 850,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "credito",
+    "date": "2026-06-16T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "CAIXA (Abertura)",
+    "amount": 95.95,
+    "type": "abertura_caixa",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-17T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "café",
+    "amount": 5.15,
+    "type": "saida",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-17T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "CABO TIPO C PARA TIPO C",
+    "amount": 40,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "pix",
+    "date": "2026-06-17T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "carregador tipo c + mouse",
+    "amount": 120,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "credito",
+    "date": "2026-06-17T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "hub usb",
+    "amount": 35,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "credito",
+    "date": "2026-06-17T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "pelicula hidrogel",
+    "amount": 30,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "credito",
+    "date": "2026-06-17T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "capa",
+    "amount": 50,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "debito",
+    "date": "2026-06-17T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "impressão",
+    "amount": 3,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-17T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "os6515",
+    "amount": 280,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-17T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "os6512",
+    "amount": 220,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "pix",
+    "date": "2026-06-17T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "pelicula hidrogel",
+    "amount": 30,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "pix",
+    "date": "2026-06-17T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "pagamento bia",
+    "amount": 80,
+    "type": "saida",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-17T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "CAIXA (Abertura)",
+    "amount": 88.8,
+    "type": "abertura_caixa",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-18T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "café",
+    "amount": 8.75,
+    "type": "saida",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-18T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "doação appo",
+    "amount": 10,
+    "type": "saida",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-18T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "impressão",
+    "amount": 1.05,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-18T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "CAPA",
+    "amount": 20,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "pix",
+    "date": "2026-06-18T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "compra caixa de som",
+    "amount": 40,
+    "type": "saida",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-18T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "galão de agua",
+    "amount": 10.5,
+    "type": "saida",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-18T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "pelicula hidrogel",
+    "amount": 30,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "pix",
+    "date": "2026-06-18T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "hub usb 4 port",
+    "amount": 45,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-18T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "conversor digital intelbras",
+    "amount": 190,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "debito",
+    "date": "2026-06-18T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "serviço impressão",
+    "amount": 10,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-18T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "chip s recarga",
+    "amount": 20,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "debito",
+    "date": "2026-06-18T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "os8364",
+    "amount": 290,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "pix",
+    "date": "2026-06-18T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "OS6518 + CAPA+ PELICULA",
+    "amount": 270,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "pix",
+    "date": "2026-06-18T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "CHIP + CAPA",
+    "amount": 50,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-18T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "TROCA PIX P DINHEIRO",
+    "amount": 50,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-18T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "PAGAMENTO BIA",
+    "amount": 80,
+    "type": "saida",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-18T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "CAIXA (Abertura)",
+    "amount": 95.6,
+    "type": "abertura_caixa",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-19T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "café",
+    "amount": 12.7,
+    "type": "saida",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-19T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "FONE BLUETOOTH",
+    "amount": 80,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "debito",
+    "date": "2026-06-19T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "vidrex",
+    "amount": 20,
+    "type": "saida",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-19T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "cabo rca",
+    "amount": 15,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "pix",
+    "date": "2026-06-19T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "kit mouse e teclado+ entrega",
+    "amount": 90,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "credito",
+    "date": "2026-06-19T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "pelicula hidrogel",
+    "amount": 25,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "pix",
+    "date": "2026-06-19T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "chip c recarga",
+    "amount": 30,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "pix",
+    "date": "2026-06-19T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "cabo 4mm",
+    "amount": 30,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-19T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "CAPA + PELICULA + CHIP S RECARGA",
+    "amount": 70,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "debito",
+    "date": "2026-06-19T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "carregador iphone",
+    "amount": 25,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "pix",
+    "date": "2026-06-19T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "CAIXA (Abertura)",
+    "amount": 92.9,
+    "type": "abertura_caixa",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-21T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "venda note lenovo",
+    "amount": 1000,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "credito",
+    "date": "2026-06-21T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "PELICULA DE GEL",
+    "amount": 30,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "pix",
+    "date": "2026-06-21T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "CARREGADOR 65 W + 7 BATERIAS 1130",
+    "amount": 205,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "debito",
+    "date": "2026-06-21T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "CABO IPHONE PARA TIPO C",
+    "amount": 25,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "credito",
+    "date": "2026-06-21T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "IMPRESSORA HP",
+    "amount": 1050,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "credito",
+    "date": "2026-06-21T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "PELICULA DE GEL",
+    "amount": 30,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "credito",
+    "date": "2026-06-21T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "suporte celular saida de ar",
+    "amount": 20,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "pix",
+    "date": "2026-06-21T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "devl. Dinheiro .",
+    "amount": 20,
+    "type": "saida",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-21T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "BACKUP",
+    "amount": 60,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "credito",
+    "date": "2026-06-21T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "ADAP BLUETOOTH AUX",
+    "amount": 25,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "debito",
+    "date": "2026-06-21T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "REMOÇÃO DE TELA",
+    "amount": 80,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "credito",
+    "date": "2026-06-21T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "CABO TIPO C PARA TIPO C",
+    "amount": 45,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "pix",
+    "date": "2026-06-21T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "CAPA",
+    "amount": 25,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "debito",
+    "date": "2026-06-21T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "HIDROGEL (3)",
+    "amount": 90,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-21T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "CAIXA (Abertura)",
+    "amount": 62.9,
+    "type": "abertura_caixa",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-22T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "café",
+    "amount": 6.2,
+    "type": "saida",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-22T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "IMPRESSÃO",
+    "amount": 1,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-22T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "cabo usb",
+    "amount": 15,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "debito",
+    "date": "2026-06-22T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "capa",
+    "amount": 20,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-22T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "chip s recarga",
+    "amount": 20,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "pix",
+    "date": "2026-06-22T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "os6521",
+    "amount": 140,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-22T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "carregador automotivo",
+    "amount": 30,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "debito",
+    "date": "2026-06-22T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "mangueira",
+    "amount": 50,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-22T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "cabo hdmi",
+    "amount": 10,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "debito",
+    "date": "2026-06-22T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "OS PC GUILHERME",
+    "amount": 450,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "credito",
+    "date": "2026-06-22T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "UBER",
+    "amount": 20,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-22T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "CR 2032",
+    "amount": 7,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-22T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "os6523",
+    "amount": 220,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "pix",
+    "date": "2026-06-22T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "restante serviço rodrigo",
+    "amount": 100,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "pix",
+    "date": "2026-06-22T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "PGTO BIA",
+    "amount": 80,
+    "type": "saida",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-22T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "Descrição",
+    "amount": 1,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-23T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "CAIXA (Abertura)",
+    "amount": 72.3,
+    "type": "abertura_caixa",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-23T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "café",
+    "amount": 6.4,
+    "type": "saida",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-23T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "capa",
+    "amount": 20,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-23T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "capa+ pelicula",
+    "amount": 50,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "credito",
+    "date": "2026-06-23T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "carregador iphone",
+    "amount": 50,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "credito",
+    "date": "2026-06-23T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "impressão",
+    "amount": 1,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-23T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "dualband",
+    "amount": 60,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "pix",
+    "date": "2026-06-23T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "troca de ssd + teclado e mouse",
+    "amount": 420,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "pix",
+    "date": "2026-06-23T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "pagamento bia",
+    "amount": 50,
+    "type": "saida",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-23T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "DELL",
+    "amount": 50,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "pix",
+    "date": "2026-06-23T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "PROJETOR",
+    "amount": 260,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "credito",
+    "date": "2026-06-23T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "CAIXA (Abertura)",
+    "amount": 58.8,
+    "type": "abertura_caixa",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-24T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "café",
+    "amount": 16,
+    "type": "saida",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-24T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "memoria usada",
+    "amount": 120,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "credito",
+    "date": "2026-06-24T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "mouse+ teclado",
+    "amount": 55,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "credito",
+    "date": "2026-06-24T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "pelicula hidrogel",
+    "amount": 60,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-24T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "pelicula hidrogel",
+    "amount": 60,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "pix",
+    "date": "2026-06-24T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "os8361",
+    "amount": 320,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "credito",
+    "date": "2026-06-24T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "OS 6525",
+    "amount": 430,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "pix",
+    "date": "2026-06-24T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "CARREGADOR IPHONE",
+    "amount": 45,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-24T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "FALTA",
+    "amount": 0.5,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-24T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "PGTO BIA (80 DE HOJE + 30 QUE FALTARAM ONTEM)",
+    "amount": 110,
+    "type": "saida",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-24T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "COMPRA GABINETE MANCER",
+    "amount": 50,
+    "type": "saida",
+    "category": "",
+    "paymentMethod": "pix",
+    "date": "2026-06-24T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "CAIXA (Abertura)",
+    "amount": 38.3,
+    "type": "abertura_caixa",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-25T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "pelicula hidrogel",
+    "amount": 30,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "credito",
+    "date": "2026-06-25T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "cabo hdmi",
+    "amount": 10,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "debito",
+    "date": "2026-06-25T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "entrada de 50,00 descarte eletronico",
+    "amount": 50,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-25T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "doce miudo guilherme",
+    "amount": 13,
+    "type": "saida",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-25T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "IMPRESSÃO",
+    "amount": 6,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "pix",
+    "date": "2026-06-25T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "cabo p2 p2",
+    "amount": 20,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-25T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "IMPRESSÃO",
+    "amount": 1,
+    "type": "entrada",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-25T09:00:00.000Z",
+    "sellerId": ""
+  },
+  {
+    "description": "pagamento bia (faltam 30,00 será pego amanhã)",
+    "amount": 50,
+    "type": "saida",
+    "category": "",
+    "paymentMethod": "dinheiro",
+    "date": "2026-06-25T09:00:00.000Z",
+    "sellerId": ""
+  }
+]

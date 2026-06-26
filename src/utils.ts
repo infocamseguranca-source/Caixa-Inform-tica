@@ -36,13 +36,22 @@ export function formatPhone(phone: string): string {
   return phone;
 }
 
-export function generateOSNumber(): string {
+export function generateOSNumber(existingOsCount?: number): string {
+  if (existingOsCount !== undefined) {
+    const nextNum = existingOsCount + 1;
+    return `OS-${nextNum.toString().padStart(4, '0')}`;
+  }
   const chars = '0123456789';
   let result = 'OS-';
   for (let i = 0; i < 5; i++) {
     result += chars.charAt(Math.floor(Math.random() * chars.length));
   }
   return result;
+}
+
+export function capitalizeFirstLetter(str: string): string {
+  if (!str) return '';
+  return str.charAt(0).toUpperCase() + str.slice(1);
 }
 
 export function exportToExcel(data: any[], fileName: string) {

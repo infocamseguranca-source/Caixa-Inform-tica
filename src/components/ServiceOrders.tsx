@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { 
   Wrench, 
   Search, 
@@ -14,6 +14,8 @@ import {
   Play,
   Check,
   Printer,
+  FileText,
+  Key,
   ChevronRight,
   Edit,
   Trash2,
@@ -24,13 +26,17 @@ import {
   Share2,
   ExternalLink,
   QrCode,
-  Grid
+  Grid,
+  Download,
+  MessageCircle
 } from 'lucide-react';
-import { ServiceOrder, OSStatus, PartOrder, ShopConfig, Customer } from '../types';
+import { ServiceOrder, OSStatus, PartOrder, ShopConfig, Customer, Staff } from '../types';
 import { formatCurrency, formatDate, generateOSNumber, formatPhone } from '../utils';
 import CustomerAutocomplete from './CustomerAutocomplete';
 import { motion, AnimatePresence } from 'motion/react';
 import { jsPDF } from 'jspdf';
+
+import PatternLockWidget from './PatternLockWidget';
 
 interface ServiceOrdersProps {
   serviceOrders: ServiceOrder[];
@@ -38,6 +44,7 @@ interface ServiceOrdersProps {
   onEditOS: (id: string, os: Partial<ServiceOrder>) => Promise<ServiceOrder>;
   onDeleteOS: (id: string) => Promise<void>;
   onReceivePayment: (os: ServiceOrder, paymentMethod: 'dinheiro' | 'pix' | 'debito' | 'credito') => Promise<void>;
+  onAddCustomer?: (customer: Omit<Customer, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
   shopName?: string;
   shopPhone?: string;
   shopCnpjCpf?: string;
@@ -48,7 +55,15 @@ interface ServiceOrdersProps {
   config?: ShopConfig;
   user: any | null;
   customers: Customer[];
+  staffList: Staff[];
 }
+
+const capitalizeSentences = (text: string): string => {
+  if (!text) return '';
+  return text.replace(/(^\s*|[.!?]\s+)(.)/g, (match, separator, char) => {
+    return separator + char.toUpperCase();
+  });
+};
 
 const STATUS_OPTIONS: { value: OSStatus; label: string; colorClass: string; bgClass: string; borderClass: string }[] = [
   { value: 'aguardando', label: 'Orçamento', colorClass: 'text-amber-700', bgClass: 'bg-amber-50', borderClass: 'border-amber-200' },
@@ -74,6 +89,7 @@ export default function ServiceOrders({
   onEditOS,
   onDeleteOS,
   onReceivePayment,
+  onAddCustomer,
   shopName,
   shopPhone,
   shopCnpjCpf,
@@ -83,11 +99,15 @@ export default function ServiceOrders({
   googleToken,
   config,
   user,
-  customers
+  customers,
+  staffList
 }: ServiceOrdersProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState<'todas' | OSStatus>('todas');
   
+  const [filterMonth, setFilterMonth] = useState<string>('todos');
+  const [filterDay, setFilterDay] = useState<string>('todos');
+
   // Sorting order ('desc' is newest first, 'asc' is oldest first)
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
 
@@ -137,13 +157,8 @@ export default function ServiceOrders({
       setIsFinalizeModalOpen(false);
       setFinalizingOS(null);
       
-      try {
-        await generateAndSaveOSPDF(updatedOS);
-      } catch (pdfErr) {
-        console.error('Erro ao gerar/salvar PDF:', pdfErr);
-      }
-      
-      alert('Ordem de Serviço finalizada com sucesso!');
+      setSavedOSForPrompt(updatedOS);
+      setIsSavedPromptOpen(true);
     } catch (err) {
       console.error(err);
       alert('Erro ao finalizar a Ordem de Serviço.');
@@ -153,17 +168,28 @@ export default function ServiceOrders({
   // Modals
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingOS, setEditingOS] = useState<ServiceOrder | null>(null);
+  
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [paymentOS, setPaymentOS] = useState<ServiceOrder | null>(null);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'dinheiro' | 'pix' | 'debito' | 'credito'>('pix');
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
   const [printOS, setPrintOS] = useState<ServiceOrder | null>(null);
 
+  // Saved / Finalized OS prompt states
+  const [isSavedPromptOpen, setIsSavedPromptOpen] = useState(false);
+  const [savedOSForPrompt, setSavedOSForPrompt] = useState<ServiceOrder | null>(null);
+
+  // Confirm Print Prompt states
+  const [isConfirmPrintModalOpen, setIsConfirmPrintModalOpen] = useState(false);
+  const [confirmPrintOS, setConfirmPrintOS] = useState<ServiceOrder | null>(null);
+
   // Form Fields
   const [customerName, setCustomerName] = useState('');
+  const [customerCpfCnpj, setCustomerCpfCnpj] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
   const [customerBirthDate, setCustomerBirthDate] = useState('');
+  const [customerAddress, setCustomerAddress] = useState('');
   const [deviceName, setDeviceName] = useState('');
   const [deviceType, setDeviceType] = useState('Celular');
   const [serialNumber, setSerialNumber] = useState('');
@@ -174,9 +200,12 @@ export default function ServiceOrders({
   const [priceLaborStr, setPriceLaborStr] = useState('0');
   const [pricePartsStr, setPricePartsStr] = useState('0');
   const [paymentStatus, setPaymentStatus] = useState<'pendente' | 'pago'>('pendente');
+  const [technicianId, setTechnicianId] = useState<string>('');
 
   // New Fields: Pattern Lock sequence
   const [patternLock, setPatternLock] = useState<string>('');
+  const [passwordType, setPasswordType] = useState<'pin' | 'padrao' | 'escrita'>('padrao');
+  const [passwordValue, setPasswordValue] = useState<string>('');
   
   // Signature ref
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -195,120 +224,321 @@ export default function ServiceOrders({
   // Automatically generate and save/download OS PDF locally, and upload to Google Drive if token available
   const generateAndSaveOSPDF = async (os: ServiceOrder) => {
     try {
-      console.log('Starting automated PDF generation and local save for O.S. #', os.osNumber);
+      console.log('Starting custom visual PDF generation for O.S. #', os.osNumber);
 
-      // 1. Create a beautiful A4 PDF using jsPDF
       const doc = new jsPDF({
         orientation: 'p',
         unit: 'mm',
         format: 'a4'
       });
 
-      // Simple elegant black and white high-contrast header styling for standard business receipt
-      doc.setFont('Helvetica', 'bold');
-      doc.setFontSize(16);
-      doc.text(shopName || 'INFO_CAM ASSISTENCIA TECNICA', 14, 20);
+      // Helper to convert hex to rgb
+      const hexToRgb = (hexStr: string) => {
+        let hex = hexStr.replace('#', '');
+        if (hex.length === 3) {
+          hex = hex.split('').map(c => c + c).join('');
+        }
+        const r = parseInt(hex.substring(0, 2), 16) || 24;
+        const g = parseInt(hex.substring(2, 4), 16) || 24;
+        const b = parseInt(hex.substring(4, 6), 16) || 27;
+        return { r, g, b };
+      };
 
-      doc.setFontSize(9);
-      doc.setFont('Helvetica', 'normal');
-      doc.text(`Contato: ${shopPhone || ''} | CNPJ/CPF: ${shopCnpjCpf || ''}`, 14, 26);
-      doc.text(`Email: ${shopEmail || ''}`, 14, 31);
+      const primaryHex = config?.colors?.primary || '#18181b';
+      const rgb = hexToRgb(primaryHex);
 
-      doc.setFont('Helvetica', 'bold');
-      doc.setFontSize(14);
-      doc.text(`O.S. NUMERO: ${os.osNumber}`, 130, 20);
-      doc.setFontSize(9);
-      doc.setFont('Helvetica', 'normal');
-      doc.text(`Abertura: ${formatDate(os.createdAt)}`, 130, 26);
-      doc.text(`Status: ${os.status.toUpperCase()}`, 130, 31);
+      // --- PAGE BORDER & STYLE ---
+      doc.setDrawColor(228, 228, 231); // Light zinc border
+      doc.rect(10, 10, 190, 277); // Outer frame
 
-      doc.setDrawColor(220, 220, 224);
-      doc.line(14, 35, 196, 35);
+      // --- HEADER ACCENT BAR (Top colored brand bar) ---
+      doc.setFillColor(rgb.r, rgb.g, rgb.b);
+      doc.rect(10, 10, 190, 5, 'F');
 
-      // Customer section
-      doc.setFont('Helvetica', 'bold');
-      doc.setFontSize(10);
-      doc.text('DADOS DO CLIENTE', 14, 42);
-      doc.setFont('Helvetica', 'normal');
-      doc.setFontSize(9);
-      doc.text(`Nome: ${os.customerName}`, 14, 48);
-      doc.text(`Telefone: ${formatPhone(os.customerPhone)}`, 14, 53);
-      doc.text(`Email: ${os.customerEmail || 'Não cadastrado'}`, 14, 58);
-
-      // Equipment section
-      doc.setFont('Helvetica', 'bold');
-      doc.setFontSize(10);
-      doc.text('DADOS DO APARELHO', 110, 42);
-      doc.setFont('Helvetica', 'normal');
-      doc.setFontSize(9);
-      doc.text(`Equipamento: ${os.deviceName}`, 110, 48);
-      doc.text(`Tipo: ${os.deviceType || 'N/A'}`, 110, 53);
-      doc.text(`N/S Série: ${os.serialNumber || 'N/A'}`, 110, 58);
-
-      doc.line(14, 64, 196, 64);
-
-      // Technical descriptions
-      doc.setFont('Helvetica', 'bold');
-      doc.setFontSize(10);
-      doc.text('DEFEITO RECLAMADO', 14, 71);
-      doc.setFont('Helvetica', 'normal');
-      doc.setFontSize(9);
-      doc.text(os.reportedDefect || 'Sem informações.', 14, 77, { maxWidth: 180 });
-
-      doc.setFont('Helvetica', 'bold');
-      doc.setFontSize(10);
-      doc.text('LAUDO E DIAGNOSTICO TECNICO', 14, 93);
-      doc.setFont('Helvetica', 'normal');
-      doc.setFontSize(9);
-      doc.text(os.technicalDiagnosis || 'Aguardando diagnóstico do técnico.', 14, 99, { maxWidth: 180 });
-
-      doc.line(14, 115, 196, 115);
-
-      // Pricing & details
-      doc.setFont('Helvetica', 'bold');
-      doc.setFontSize(10);
-      doc.text('RESUMO DE VALORES E FATURAMENTO', 14, 122);
-      doc.setFont('Helvetica', 'normal');
-      doc.setFontSize(9);
-      doc.text(`Mão de Obra / Serviços: ${formatCurrency(os.priceLabor)}`, 14, 128);
-      doc.text(`Materiais / Peças de Reposição: ${formatCurrency(os.priceParts)}`, 14, 133);
-      
-      doc.setFont('Helvetica', 'bold');
-      doc.setFontSize(11);
-      doc.text(`VALOR TOTAL: ${formatCurrency(os.totalAmount)}`, 14, 142);
-      doc.text(`SITUACAO FINANCEIRA: ${os.paymentStatus === 'pago' ? 'RECEBIDO / PAGO' : 'PAGAMENTO PENDENTE'}`, 110, 142);
-
-      doc.line(14, 150, 196, 150);
-
-      // Observations
-      if (os.deviceObservations) {
+      // --- COMPANY LOGO OR TITLE ---
+      if (shopLogo && shopLogo.trim().startsWith('data:image')) {
+        try {
+          doc.addImage(shopLogo, 'PNG', 15, 18, 20, 20);
+          doc.setFont('Helvetica', 'bold');
+          doc.setFontSize(14);
+          doc.setTextColor(30, 30, 30);
+          doc.text(shopName || 'INFO_CAM TECNOLOGIA', 39, 23);
+          
+          doc.setFont('Helvetica', 'normal');
+          doc.setFontSize(8);
+          doc.setTextColor(100, 100, 100);
+          doc.text(`CNPJ/CPF: ${shopCnpjCpf || 'N/A'}`, 39, 28);
+          doc.text(`Contato: ${formatPhone(shopPhone || '')} | Email: ${shopEmail || 'N/A'}`, 39, 33);
+        } catch (logoErr) {
+          console.error("Error drawing shop logo, defaulting to text:", logoErr);
+          // Fallback text
+          doc.setFont('Helvetica', 'bold');
+          doc.setFontSize(16);
+          doc.setTextColor(rgb.r, rgb.g, rgb.b);
+          doc.text(shopName || 'INFO_CAM TECNOLOGIA', 15, 24);
+          
+          doc.setFont('Helvetica', 'normal');
+          doc.setFontSize(8);
+          doc.setTextColor(100, 100, 100);
+          doc.text(`CNPJ/CPF: ${shopCnpjCpf || 'N/A'} | Contato: ${formatPhone(shopPhone || '')}`, 15, 30);
+          doc.text(`Email: ${shopEmail || 'N/A'}`, 15, 35);
+        }
+      } else {
+        // Text header
         doc.setFont('Helvetica', 'bold');
-        doc.setFontSize(9);
-        doc.text('OBSERVACOES INTERNAS:', 14, 156);
+        doc.setFontSize(16);
+        doc.setTextColor(rgb.r, rgb.g, rgb.b);
+        doc.text(shopName || 'INFO_CAM TECNOLOGIA', 15, 24);
+        
         doc.setFont('Helvetica', 'normal');
-        doc.text(os.deviceObservations, 14, 161, { maxWidth: 180 });
-        doc.line(14, 172, 196, 172);
+        doc.setFontSize(8);
+        doc.setTextColor(100, 100, 100);
+        doc.text(`CNPJ/CPF: ${shopCnpjCpf || 'N/A'} | Contato: ${formatPhone(shopPhone || '')}`, 15, 30);
+        doc.text(`Email: ${shopEmail || 'N/A'}`, 15, 35);
       }
 
-      // Legal disclaimer terms
+      // --- DOCUMENT METADATA PANEL (Right Header) ---
+      doc.setFillColor(244, 244, 245); // light grey block
+      doc.rect(130, 18, 65, 22, 'F');
+      doc.setDrawColor(212, 212, 216);
+      doc.rect(130, 18, 65, 22);
+
+      doc.setFont('Helvetica', 'bold');
+      doc.setFontSize(11);
+      doc.setTextColor(30, 30, 30);
+      doc.text(`ORDEM DE SERVIÇO`, 134, 23);
+      doc.setFontSize(12);
+      doc.setTextColor(rgb.r, rgb.g, rgb.b);
+      doc.text(`Nº ${os.osNumber}`, 134, 29);
+
       doc.setFont('Helvetica', 'normal');
+      doc.setFontSize(7.5);
+      doc.setTextColor(100, 100, 100);
+      doc.text(`Abertura: ${formatDate(os.createdAt)}`, 134, 34);
+      doc.text(`Status: ${os.status.toUpperCase()}`, 134, 38);
+
+      // --- SECTION BUILDER HELPER ---
+      const drawSectionHeader = (title: string, yPos: number) => {
+        doc.setFillColor(rgb.r, rgb.g, rgb.b);
+        doc.rect(15, yPos, 180, 5.5, 'F');
+        doc.setFont('Helvetica', 'bold');
+        doc.setFontSize(8.5);
+        doc.setTextColor(255, 255, 255);
+        doc.text(title, 18, yPos + 4);
+      };
+
+      // --- CLIENT DATA SECTION ---
+      let y = 46;
+      drawSectionHeader('DADOS DO CLIENTE', y);
+      
+      doc.setDrawColor(rgb.r, rgb.g, rgb.b);
+      doc.rect(15, y + 5.5, 180, 22); // Client box
+      
       doc.setFontSize(8);
-      doc.text('1. Os serviços prestados possuem garantia legal de 90 dias a contar da entrega do aparelho.', 14, 180);
-      doc.text('2. Aparelhos não retirados em até 90 dias após a notificação de finalização estarão sujeitos a venda para custeio do reparo.', 14, 184);
+      doc.setTextColor(80, 80, 80);
+      doc.setFont('Helvetica', 'bold');
+      doc.text('Nome:', 18, y + 10.5);
+      doc.setFont('Helvetica', 'normal');
+      doc.setTextColor(30, 30, 30);
+      doc.text(os.customerName, 28, y + 10.5);
 
-      // Signature lines
+      if (os.customerCpfCnpj) {
+        doc.setTextColor(80, 80, 80);
+        doc.setFont('Helvetica', 'bold');
+        doc.text('CPF/CNPJ:', 120, y + 10.5);
+        doc.setFont('Helvetica', 'normal');
+        doc.setTextColor(30, 30, 30);
+        doc.text(os.customerCpfCnpj, 137, y + 10.5);
+      }
+
+      doc.setTextColor(80, 80, 80);
+      doc.setFont('Helvetica', 'bold');
+      doc.text('Telefone:', 18, y + 15.5);
+      doc.setFont('Helvetica', 'normal');
+      doc.setTextColor(30, 30, 30);
+      doc.text(formatPhone(os.customerPhone), 31, y + 15.5);
+
+      doc.setTextColor(80, 80, 80);
+      doc.setFont('Helvetica', 'bold');
+      doc.text('Email:', 18, y + 20.5);
+      doc.setFont('Helvetica', 'normal');
+      doc.setTextColor(30, 30, 30);
+      doc.text(os.customerEmail || 'Não informado', 28, y + 20.5);
+
+      // Address on client box right-side
+      doc.setTextColor(80, 80, 80);
+      doc.setFont('Helvetica', 'bold');
+      doc.text('Endereço:', 105, y + 10.5);
+      doc.setFont('Helvetica', 'normal');
+      doc.setTextColor(30, 30, 30);
+      doc.text(os.customerAddress || 'Não informado', 120, y + 10.5, { maxWidth: 70 });
+
+      // --- DEVICE / EQUIPMENT DATA SECTION ---
+      y = 78;
+      drawSectionHeader('ESPECIFICAÇÕES DO EQUIPAMENTO', y);
+      
+      doc.rect(15, y + 5.5, 180, 18); // Equipment box
+      
+      doc.setFontSize(8);
+      doc.setTextColor(80, 80, 80);
+      doc.setFont('Helvetica', 'bold');
+      doc.text('Equipamento:', 18, y + 10.5);
+      doc.setFont('Helvetica', 'normal');
+      doc.setTextColor(30, 30, 30);
+      doc.text(os.deviceName, 38, y + 10.5);
+
+      doc.setTextColor(80, 80, 80);
+      doc.setFont('Helvetica', 'bold');
+      doc.text('Tipo de Aparelho:', 18, y + 15.5);
+      doc.setFont('Helvetica', 'normal');
+      doc.setTextColor(30, 30, 30);
+      doc.text(os.deviceType || 'Celular', 42, y + 15.5);
+
+      doc.setTextColor(80, 80, 80);
+      doc.setFont('Helvetica', 'bold');
+      doc.text('Nº de Série/IMEI:', 105, y + 10.5);
+      doc.setFont('Helvetica', 'normal');
+      doc.setTextColor(30, 30, 30);
+      doc.text(os.serialNumber || 'N/A', 130, y + 10.5);
+
+      // Password logic: "e a senha Padrão aparecendo apenas na OS de celular ou tablets."
+      const isCellOrTablet = ['celular', 'tablet', 'celulares', 'tablets', 'smartphone', 'smartphones'].includes((os.deviceType || '').toLowerCase());
+      if (isCellOrTablet) {
+        doc.setTextColor(80, 80, 80);
+        doc.setFont('Helvetica', 'bold');
+        doc.text('Senha de Desbloqueio:', 105, y + 15.5);
+        doc.setFont('Helvetica', 'normal');
+        doc.setTextColor(190, 24, 24); // red text to make it easy to find
+        let pwdText = 'Não informada';
+        if (os.passwordType === 'padrao' || !os.passwordType) {
+          pwdText = os.patternLock ? `Padrão: ${os.patternLock}` : 'Não informada';
+        } else {
+          pwdText = `${os.passwordType === 'pin' ? 'PIN' : 'Escrita'}: ${os.passwordValue || 'Não informada'}`;
+        }
+        doc.text(pwdText, 140, y + 15.5);
+      } else {
+        doc.setTextColor(120, 120, 120);
+        doc.setFont('Helvetica', 'normal');
+        doc.text('Senha de Desbloqueio: Ocultada (Dispositivo s/ tela)', 105, y + 15.5);
+      }
+
+      // --- PROBLEM AND DIAGNOSIS SECTION ---
+      y = 106;
+      drawSectionHeader('DEFEITO RECLAMADO & DIAGNÓSTICO TÉCNICO', y);
+      
+      doc.rect(15, y + 5.5, 180, 32); // Problem box
+      
+      doc.setFontSize(8);
+      doc.setTextColor(80, 80, 80);
+      doc.setFont('Helvetica', 'bold');
+      doc.text('Defeito Reclamado pelo Cliente:', 18, y + 10.5);
+      doc.setFont('Helvetica', 'normal');
+      doc.setTextColor(30, 30, 30);
+      doc.text(os.reportedDefect || 'Sem defeito relatado.', 18, y + 15.5, { maxWidth: 174 });
+
+      doc.setFont('Helvetica', 'bold');
+      doc.setTextColor(80, 80, 80);
+      doc.text('Diagnóstico e Solução Técnica:', 18, y + 23.5);
+      doc.setFont('Helvetica', 'normal');
+      doc.setTextColor(30, 30, 30);
+      doc.text(os.technicalDiagnosis || 'Aguardando avaliação técnica.', 18, y + 28.5, { maxWidth: 174 });
+
+      // --- FINANCIAL AND PRICING SUMMARY ---
+      y = 148;
+      drawSectionHeader('VALORES E SITUAÇÃO DE FATURAMENTO', y);
+      
+      doc.setFillColor(248, 250, 252); // extremely soft slate blue bg
+      doc.rect(15, y + 5.5, 180, 24, 'F');
+      doc.rect(15, y + 5.5, 180, 24); // border
+      
+      doc.setFontSize(8);
+      doc.setTextColor(80, 80, 80);
+      doc.setFont('Helvetica', 'bold');
+      doc.text('Valor da Mão de Obra / Serviços:', 18, y + 11);
+      doc.setFont('Helvetica', 'normal');
+      doc.setTextColor(30, 30, 30);
+      doc.text(formatCurrency(os.priceLabor), 65, y + 11);
+
+      doc.setTextColor(80, 80, 80);
+      doc.setFont('Helvetica', 'bold');
+      doc.text('Valor de Peças / Componentes:', 18, y + 16);
+      doc.setFont('Helvetica', 'normal');
+      doc.setTextColor(30, 30, 30);
+      doc.text(formatCurrency(os.priceParts), 65, y + 16);
+
+      // Draw vertical divider
+      doc.setDrawColor(200, 200, 200);
+      doc.line(110, y + 7, 110, y + 22);
+
+      // Right column summary (TOTAL)
+      doc.setFont('Helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.setTextColor(rgb.r, rgb.g, rgb.b);
+      doc.text(`VALOR TOTAL: ${formatCurrency(os.totalAmount)}`, 115, y + 12);
+      
+      doc.setFontSize(8);
+      doc.setTextColor(80, 80, 80);
+      doc.text('Situação Financeira:', 115, y + 18);
+      doc.setFont('Helvetica', 'bold');
+      if (os.paymentStatus === 'pago') {
+        doc.setTextColor(22, 101, 52); // green
+        doc.text('PAGO / RECEBIDO', 148, y + 18);
+      } else {
+        doc.setTextColor(180, 83, 9); // orange
+        doc.text('PENDENTE / AGUARDANDO', 148, y + 18);
+      }
+
+      // --- OBSERVATIONS AND TERMS ---
+      y = 182;
+      drawSectionHeader('TERMOS DE SERVIÇO & OBSERVAÇÕES', y);
+      
+      doc.rect(15, y + 5.5, 180, 22); // Terms box
+      
+      doc.setFontSize(6.5);
+      doc.setFont('Helvetica', 'normal');
+      doc.setTextColor(100, 100, 100);
+      doc.text('1. Os serviços prestados possuem garantia legal de 90 dias a contar da data de entrega do equipamento.', 18, y + 9.5);
+      doc.text('2. Aparelhos prontos e não retirados em até 90 dias úteis estarão sujeitos à venda pública para custeio dos custos de reparo, insumos e armazenamento.', 18, y + 12.5);
+      doc.text('3. A garantia cobre apenas os defeitos reparados descritos no presente laudo técnico, não se aplicando a outros componentes ou avarias futuras.', 18, y + 15.5);
+      if (os.deviceObservations) {
+        doc.setFont('Helvetica', 'bold');
+        doc.text(`OBSERVAÇÕES: ${os.deviceObservations}`, 18, y + 20.5, { maxWidth: 174 });
+      }
+
+      // --- SIGNATURES ---
+      let sigY = 216;
       doc.setDrawColor(180, 180, 180);
-      doc.line(30, 215, 90, 215);
-      doc.text('Assinatura do Técnico', 45, 219);
+      
+      // Technical Signature Line
+      doc.line(25, sigY + 18, 90, sigY + 18);
+      doc.setFont('Helvetica', 'bold');
+      doc.setFontSize(7.5);
+      doc.setTextColor(80, 80, 80);
+      doc.text('Assinatura do Técnico Responsável', 38, sigY + 22);
 
-      doc.line(120, 215, 180, 215);
-      doc.text('Assinatura do Cliente', 135, 219);
+      // Customer Signature Line
+      doc.line(120, sigY + 18, 185, sigY + 18);
+      doc.text('Assinatura do Cliente / Proprietário', 133, sigY + 22);
 
-      // Always save/download PDF locally first
+      // Draw Customer signature image if exists!
+      if (os.signature && os.signature.trim().startsWith('data:image')) {
+        try {
+          doc.addImage(os.signature, 'PNG', 132, sigY + 1, 40, 15);
+        } catch (sigErr) {
+          console.error("Error drawing signature image in PDF:", sigErr);
+        }
+      }
+
+      // Footer
+      doc.setFont('Helvetica', 'normal');
+      doc.setFontSize(6.5);
+      doc.setTextColor(150, 150, 150);
+      doc.text(`Documento emitido automaticamente em ${new Date().toLocaleString('pt-BR')}`, 15, 272);
+
+      // Save PDF locally first
       const cleanCustomerName = os.customerName.replace(/[^a-zA-Z0-9]/g, '_');
       doc.save(`OS_${os.osNumber}_${cleanCustomerName}.pdf`);
 
-      // Generate the raw PDF Blob
       const pdfBlob = doc.output('blob');
 
       // If Google Drive integration is not active or set up, don't try to upload
@@ -440,13 +670,15 @@ export default function ServiceOrders({
 
     setIsDrawing(true);
     const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
     
     // Get mouse or touch coordinates
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
     
     ctx.beginPath();
-    ctx.moveTo(clientX - rect.left, clientY - rect.top);
+    ctx.moveTo((clientX - rect.left) * scaleX, (clientY - rect.top) * scaleY);
   };
 
   const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
@@ -456,10 +688,13 @@ export default function ServiceOrders({
     if (!ctx) return;
 
     const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
 
-    ctx.lineTo(clientX - rect.left, clientY - rect.top);
+    ctx.lineTo((clientX - rect.left) * scaleX, (clientY - rect.top) * scaleY);
     ctx.stroke();
   };
 
@@ -495,6 +730,41 @@ export default function ServiceOrders({
     }
   };
 
+  const hasChangesComputed = useMemo(() => {
+    if (!editingOS) return false;
+    return (
+      customerName !== editingOS.customerName ||
+      customerCpfCnpj !== (editingOS.customerCpfCnpj || '') ||
+      customerPhone !== editingOS.customerPhone ||
+      customerEmail !== (editingOS.customerEmail || '') ||
+      customerBirthDate !== (editingOS.customerBirthDate || '') ||
+      customerAddress !== (editingOS.customerAddress || '') ||
+      deviceName !== editingOS.deviceName ||
+      deviceType !== editingOS.deviceType ||
+      serialNumber !== (editingOS.serialNumber || '') ||
+      reportedDefect !== editingOS.reportedDefect ||
+      deviceObservations !== (editingOS.deviceObservations || '') ||
+      technicalDiagnosis !== (editingOS.technicalDiagnosis || '') ||
+      status !== editingOS.status ||
+      priceLaborStr !== (editingOS.priceLabor?.toString() || '0') ||
+      pricePartsStr !== (editingOS.priceParts?.toString() || '0') ||
+      paymentStatus !== editingOS.paymentStatus ||
+      technicianId !== (editingOS.technicianId || '') ||
+      patternLock !== (editingOS.patternLock || '') ||
+      passwordType !== (editingOS.passwordType || 'padrao') ||
+      passwordValue !== (editingOS.passwordValue || '') ||
+      partName !== (editingOS.partOrder?.name || '') ||
+      partCostPrice !== (editingOS.partOrder?.costPrice?.toString() || '0') ||
+      partClientPrice !== (editingOS.partOrder?.clientPrice?.toString() || '0') ||
+      partSupplierLink !== (editingOS.partOrder?.supplierLink || '')
+    );
+  }, [
+    editingOS, customerName, customerCpfCnpj, customerPhone, customerEmail, customerBirthDate, 
+    customerAddress, deviceName, deviceType, serialNumber, reportedDefect, 
+    deviceObservations, technicalDiagnosis, status, priceLaborStr, pricePartsStr, 
+    paymentStatus, technicianId, patternLock, passwordType, passwordValue, partName, partCostPrice, partClientPrice, partSupplierLink
+  ]);
+
   // Base64 Photo Upload handlers
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -516,9 +786,11 @@ export default function ServiceOrders({
   const openAddModal = () => {
     setEditingOS(null);
     setCustomerName('');
+    setCustomerCpfCnpj('');
     setCustomerPhone('');
     setCustomerEmail('');
     setCustomerBirthDate('');
+    setCustomerAddress('');
     setDeviceName('');
     setDeviceType('Celular');
     setSerialNumber('');
@@ -529,7 +801,10 @@ export default function ServiceOrders({
     setPriceLaborStr('0');
     setPricePartsStr('0');
     setPaymentStatus('pendente');
+    setTechnicianId('');
     setPatternLock('');
+    setPasswordType('padrao');
+    setPasswordValue('');
     setPhotos([]);
     setSignatureData('');
     // Part Order reset
@@ -543,9 +818,11 @@ export default function ServiceOrders({
   const openEditModal = (os: ServiceOrder) => {
     setEditingOS(os);
     setCustomerName(os.customerName);
+    setCustomerCpfCnpj(os.customerCpfCnpj || '');
     setCustomerPhone(os.customerPhone);
     setCustomerEmail(os.customerEmail || '');
     setCustomerBirthDate(os.customerBirthDate || '');
+    setCustomerAddress(os.customerAddress || '');
     setDeviceName(os.deviceName);
     setDeviceType(os.deviceType || 'Celular');
     setSerialNumber(os.serialNumber || '');
@@ -556,7 +833,10 @@ export default function ServiceOrders({
     setPriceLaborStr(os.priceLabor.toString());
     setPricePartsStr(os.priceParts.toString());
     setPaymentStatus(os.paymentStatus);
+    setTechnicianId(os.technicianId || '');
     setPatternLock(os.patternLock || '');
+    setPasswordType(os.passwordType || 'padrao');
+    setPasswordValue(os.passwordValue || '');
     setPhotos(os.photos || []);
     setSignatureData(os.signature || '');
     // Part Order fields loading
@@ -583,13 +863,45 @@ export default function ServiceOrders({
     }
 
     try {
+      // Auto-register customer if not exists
+      if (onAddCustomer && customerName.trim()) {
+        const normalizedNewPhone = customerPhone.replace(/\D/g, '');
+        const normalizedNewName = customerName.trim().toLowerCase();
+        
+        const clientExists = customers.some(c => {
+          const existingPhone = c.phone ? String(c.phone).replace(/\D/g, '') : '';
+          const existingName = c.name ? String(c.name).trim().toLowerCase() : '';
+          if (normalizedNewPhone && existingPhone && normalizedNewPhone === existingPhone) return true;
+          if (normalizedNewName === existingName) return true;
+          return false;
+        });
+
+        if (!clientExists) {
+          try {
+            await onAddCustomer({
+              name: customerName,
+              phone: customerPhone,
+              email: customerEmail,
+              address: customerAddress,
+              birthDate: customerBirthDate,
+              cpfCnpj: customerCpfCnpj
+            });
+            console.log('Customer registered automatically:', customerName);
+          } catch (autoErr) {
+            console.error('Error auto-registering customer during OS creation:', autoErr);
+          }
+        }
+      }
+
       let savedOS: ServiceOrder | null = null;
       if (editingOS) {
         savedOS = await onEditOS(editingOS.id, {
           customerName,
+          customerCpfCnpj,
           customerPhone,
           customerEmail,
           customerBirthDate,
+          customerAddress,
           deviceName,
           deviceType,
           serialNumber,
@@ -602,16 +914,21 @@ export default function ServiceOrders({
           totalAmount: priceLabor + priceParts,
           paymentStatus,
           patternLock,
+          passwordType,
+          passwordValue,
           signature: signatureData || undefined,
           photos,
-          partOrder
+          partOrder,
+          technicianId
         });
       } else {
         savedOS = await onAddOS({
           customerName,
+          customerCpfCnpj,
           customerPhone,
           customerEmail,
           customerBirthDate,
+          customerAddress,
           deviceName,
           deviceType,
           serialNumber,
@@ -624,15 +941,19 @@ export default function ServiceOrders({
           totalAmount: priceLabor + priceParts,
           paymentStatus,
           patternLock,
+          passwordType,
+          passwordValue,
           signature: signatureData || undefined,
           photos,
-          partOrder
+          partOrder,
+          technicianId
         });
       }
       setIsModalOpen(false);
       
       if (savedOS) {
-        generateAndSaveOSPDF(savedOS);
+        setSavedOSForPrompt(savedOS);
+        setIsSavedPromptOpen(true);
       }
     } catch (err) {
       console.error(err);
@@ -641,6 +962,14 @@ export default function ServiceOrders({
   };
 
   const handleDelete = async (id: string) => {
+    if (config?.commissionPassword) {
+      const pass = window.prompt('Digite a Senha Master para excluir:');
+      if (pass !== config.commissionPassword) {
+        alert('Senha incorreta!');
+        return;
+      }
+    }
+
     if (window.confirm('Excluir esta ordem de serviço? Isso removerá o registro permanentemente.')) {
       try {
         await onDeleteOS(id);
@@ -649,6 +978,87 @@ export default function ServiceOrders({
         alert('Erro ao excluir.');
       }
     }
+  };
+
+  const handleSendWhatsApp = (os: ServiceOrder) => {
+    if (!os.customerPhone) {
+      alert('Esta OS não possui um telefone de cliente cadastrado.');
+      return;
+    }
+
+    const cleanPhone = os.customerPhone.replace(/\D/g, '');
+    let formattedPhone = cleanPhone;
+    
+    // Check if country code is missing, assume Brazil (+55)
+    if (cleanPhone.length === 10 || cleanPhone.length === 11) {
+      formattedPhone = '55' + cleanPhone;
+    }
+
+    const statusObj = STATUS_OPTIONS.find(s => s.value === os.status);
+    const statusName = statusObj ? statusObj.label : os.status;
+
+    let messageTemplate = '';
+    
+    if (config?.whatsappMessages) {
+      if (os.status === 'pronto') {
+        messageTemplate = config.whatsappMessages.pronto || '';
+      } else if (os.status === 'aguardando') {
+        messageTemplate = config.whatsappMessages.aguardando || '';
+      } else if (os.status === 'aprovado') {
+        messageTemplate = config.whatsappMessages.aprovado || '';
+      } else if (os.status === 'em_reparo') {
+        messageTemplate = config.whatsappMessages.em_reparo || '';
+      } else if (os.status === 'entregue') {
+        messageTemplate = config.whatsappMessages.entregue || '';
+      }
+    }
+    
+    if (!messageTemplate) {
+       messageTemplate = config?.whatsappMessages?.default || `Olá, {nome}. A sua OS {os} está atualizada como *{status}*. Obrigado pela preferência!!!`;
+    }
+
+    const message = messageTemplate
+      .replace(/\{nome\}/g, os.customerName)
+      .replace(/\{os\}/g, os.osNumber)
+      .replace(/\{status\}/g, statusName);
+
+    const encodedMessage = encodeURIComponent(message);
+    const whatsappUrl = `https://wa.me/${formattedPhone}?text=${encodedMessage}`;
+
+    if (config?.whatsappApiToken && config?.whatsappPhoneNumberId) {
+      try {
+        fetch(`https://graph.facebook.com/v17.0/${config.whatsappPhoneNumberId}/messages`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${config.whatsappApiToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            messaging_product: "whatsapp",
+            to: formattedPhone,
+            type: "text",
+            text: { body: message }
+          })
+        }).then(async (response) => {
+          if (!response.ok) {
+            const errData = await response.json();
+            console.error('WhatsApp API Error:', errData);
+            alert('Erro na API do WhatsApp (verifique a regra de 24h ou credenciais). Abrindo o WhatsApp Web como fallback...');
+            window.open(whatsappUrl, '_blank');
+          } else {
+            alert('Mensagem enviada com sucesso pela API do WhatsApp Business!');
+          }
+        }).catch((err) => {
+          console.error('Fetch error:', err);
+          window.open(whatsappUrl, '_blank');
+        });
+        return;
+      } catch (err) {
+        console.error(err);
+      }
+    }
+    
+    window.open(whatsappUrl, '_blank');
   };
 
   const triggerPaymentFlow = (os: ServiceOrder) => {
@@ -672,6 +1082,11 @@ export default function ServiceOrders({
   const openPrintPreview = (os: ServiceOrder) => {
     setPrintOS(os);
     setIsPrintModalOpen(true);
+  };
+
+  const handlePrintClick = (os: ServiceOrder) => {
+    setConfirmPrintOS(os);
+    setIsConfirmPrintModalOpen(true);
   };
 
   // WhatsApp quick sharing message generator
@@ -701,7 +1116,16 @@ export default function ServiceOrders({
     
     const matchesTab = activeTab === 'todas' || os.status === activeTab;
 
-    return matchesSearch && matchesTab;
+    let matchesPeriod = true;
+    const osDate = new Date(os.createdAt);
+    if (filterMonth !== 'todos') {
+      matchesPeriod = matchesPeriod && osDate.getMonth().toString() === filterMonth;
+    }
+    if (filterDay !== 'todos') {
+      matchesPeriod = matchesPeriod && osDate.getDate().toString() === filterDay;
+    }
+
+    return matchesSearch && matchesTab && matchesPeriod;
   }).sort((a, b) => {
     const timeA = new Date(a.createdAt).getTime();
     const timeB = new Date(b.createdAt).getTime();
@@ -753,6 +1177,42 @@ export default function ServiceOrders({
             </button>
           );
         })}
+      </div>
+
+      {/* Date Filters */}
+      <div className="bg-white p-5 rounded-2xl border border-zinc-100 flex flex-col gap-3 overflow-hidden">
+        <div className="flex items-center gap-2 overflow-x-auto pb-1">
+          <span className="text-[10px] uppercase tracking-wider font-bold text-zinc-400 mr-1 min-w-[30px]">Mês:</span>
+          {Array.from({length: 12}, (_, i) => {
+            const m = i.toString();
+            const label = new Date(2020, i, 1).toLocaleString('pt-BR', { month: 'short' }).substring(0, 3).toUpperCase();
+            return (
+              <button
+                key={m}
+                onClick={() => setFilterMonth(filterMonth === m ? 'todos' : m)}
+                className={`flex-shrink-0 w-9 h-9 rounded-full text-[10px] font-bold transition-all ${filterMonth === m ? 'bg-zinc-900 text-white shadow-md scale-105' : 'bg-zinc-100 text-zinc-500 hover:bg-zinc-200'}`}
+              >
+                {label}
+              </button>
+            )
+          })}
+        </div>
+        
+        <div className="flex items-center gap-2 overflow-x-auto pb-1">
+          <span className="text-[10px] uppercase tracking-wider font-bold text-zinc-400 mr-1 min-w-[30px]">Dia:</span>
+          {Array.from({length: 31}, (_, i) => {
+            const d = (i + 1).toString();
+            return (
+              <button
+                key={d}
+                onClick={() => setFilterDay(filterDay === d ? 'todos' : d)}
+                className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${filterDay === d ? 'bg-zinc-900 text-white shadow-md scale-105' : 'bg-zinc-100 text-zinc-500 hover:bg-zinc-200'}`}
+              >
+                {d}
+              </button>
+            )
+          })}
+        </div>
       </div>
 
       {/* Search Input & Controls */}
@@ -899,7 +1359,7 @@ export default function ServiceOrders({
                             <Share2 size={16} />
                           </button>
                           <button
-                            onClick={() => openPrintPreview(os)}
+                            onClick={() => handlePrintClick(os)}
                             className="p-1.5 hover:bg-zinc-100 text-zinc-500 hover:text-zinc-900 rounded-lg transition-colors cursor-pointer"
                             title="Visualizar Comprovante / Via"
                           >
@@ -911,6 +1371,13 @@ export default function ServiceOrders({
                             title="Editar OS"
                           >
                             <Edit size={16} />
+                          </button>
+                          <button
+                            onClick={() => handleSendWhatsApp(os)}
+                            className="p-1.5 hover:bg-green-50 text-zinc-500 hover:text-green-600 rounded-lg transition-colors cursor-pointer"
+                            title="Enviar WhatsApp"
+                          >
+                            <MessageCircle size={16} />
                           </button>
                           <button
                             onClick={() => handleDelete(os.id)}
@@ -956,8 +1423,8 @@ export default function ServiceOrders({
                 {/* Section 1: Customer */}
                 <div className="space-y-3">
                   <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-wider pb-1.5 border-b border-zinc-100">Dados do Cliente</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="md:col-span-2">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
                       <label className="block text-xs font-bold text-zinc-500 mb-1">Nome Completo</label>
                       <CustomerAutocomplete
                         required
@@ -965,14 +1432,28 @@ export default function ServiceOrders({
                         onChange={setCustomerName}
                         onSelect={(client) => {
                           setCustomerName(client.name);
+                          if (client.cpfCnpj) setCustomerCpfCnpj(client.cpfCnpj);
                           if (client.phone) setCustomerPhone(client.phone);
                           if (client.email) setCustomerEmail(client.email);
                           if (client.birthDate) setCustomerBirthDate(client.birthDate);
+                          if (client.address) setCustomerAddress(client.address);
                         }}
                         user={user}
                         customers={customers}
                       />
                     </div>
+                    <div>
+                      <label className="block text-xs font-bold text-zinc-500 mb-1">CPF / CNPJ <span className="text-[9px] text-zinc-400 font-normal">(Opcional)</span></label>
+                      <input
+                        type="text"
+                        value={customerCpfCnpj}
+                        onChange={(e) => setCustomerCpfCnpj(e.target.value)}
+                        placeholder="000.000.000-00"
+                        className="w-full px-3 py-2 border border-zinc-200 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-zinc-900 bg-white"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
                     <div>
                       <label className="block text-xs font-bold text-zinc-500 mb-1">WhatsApp / Telefone</label>
                       <input
@@ -992,7 +1473,7 @@ export default function ServiceOrders({
                         type="email"
                         value={customerEmail}
                         onChange={(e) => setCustomerEmail(e.target.value)}
-                        className="w-full px-3 py-2 border border-zinc-200 rounded-xl text-xs"
+                        className="w-full px-3 py-2 border border-zinc-200 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-zinc-900"
                         placeholder="Ex: joao@email.com"
                       />
                     </div>
@@ -1002,9 +1483,19 @@ export default function ServiceOrders({
                         type="date"
                         value={customerBirthDate}
                         onChange={(e) => setCustomerBirthDate(e.target.value)}
-                        className="w-full px-3 py-2 border border-zinc-200 rounded-xl text-xs text-zinc-600 bg-white"
+                        className="w-full px-3 py-2 border border-zinc-200 rounded-xl text-xs text-zinc-600 bg-white focus:outline-none focus:ring-1 focus:ring-zinc-900"
                       />
                     </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-zinc-500 mb-1">Endereço Completo (Opcional)</label>
+                    <textarea
+                      rows={2}
+                      value={customerAddress}
+                      onChange={(e) => setCustomerAddress(capitalizeSentences(e.target.value))}
+                      className="w-full px-3 py-2 border border-zinc-200 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-zinc-900 resize-none bg-white text-zinc-800"
+                      placeholder="Ex: Rua do Imperador, 123 - Centro - Petrópolis/RJ"
+                    />
                   </div>
                 </div>
 
@@ -1037,6 +1528,19 @@ export default function ServiceOrders({
                       />
                     </div>
                     <div>
+                      <label className="block text-xs font-bold text-zinc-500 mb-1">Técnico Responsável</label>
+                      <select
+                        value={technicianId}
+                        onChange={(e) => setTechnicianId(e.target.value)}
+                        className="w-full px-3 py-2 border border-zinc-200 rounded-xl text-xs bg-white text-zinc-800"
+                      >
+                        <option value="">Selecione...</option>
+                        {staffList.filter(s => s.role === 'tecnico').map(s => (
+                          <option key={s.id} value={s.id}>{s.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
                       <label className="block text-xs font-bold text-zinc-500 mb-1">Nº de Série / Código</label>
                       <input
                         type="text"
@@ -1048,48 +1552,55 @@ export default function ServiceOrders({
                     </div>
                   </div>
 
-                  {/* Pattern Lock for Cellphones */}
-                  {deviceType === 'Celular' && (
-                    <div className="bg-zinc-50 p-4 rounded-2xl border border-zinc-150 grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
-                      <div className="space-y-1">
-                        <span className="text-xs font-bold text-zinc-700 flex items-center gap-1">
-                          <Lock size={14} className="text-zinc-500" /> Senha Padrão (9 Pontos)
+                  {/* Device Password for Cellphones and Tablets */}
+                  {['Celular', 'Tablet'].includes(deviceType) && (
+                    <div className="bg-zinc-50 p-4 rounded-2xl border border-zinc-150 flex flex-col items-center">
+                      <div className="space-y-1 w-full text-center mb-3">
+                        <span className="text-xs font-bold text-zinc-700 flex items-center justify-center gap-1">
+                          <Lock size={14} className="text-zinc-500" /> Senha do Dispositivo
                         </span>
-                        <p className="text-[10px] text-zinc-400">Clique nos pontos sequencialmente para registrar a senha padrão do celular do cliente.</p>
-                        <div className="pt-2 text-[10px] font-mono text-zinc-600">
-                          Sequência desenhada: <span className="font-bold text-zinc-950 bg-white border border-zinc-200 px-2.5 py-1 rounded">{patternLock || 'Nenhuma'}</span>
-                        </div>
-                        {patternLock && (
-                          <button
-                            type="button"
-                            onClick={() => setPatternLock('')}
-                            className="text-[9px] text-rose-600 font-extrabold hover:underline block pt-2 cursor-pointer"
-                          >
-                            Limpar Sequência
-                          </button>
-                        )}
+                        <p className="text-[10px] text-zinc-400">Qual é a senha de desbloqueio do aparelho do cliente?</p>
+                      </div>
+
+                      <div className="flex gap-2 mb-4">
+                        <button
+                          type="button"
+                          onClick={() => setPasswordType('pin')}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${passwordType === 'pin' ? 'bg-zinc-900 text-white' : 'bg-white border border-zinc-200 text-zinc-600 hover:bg-zinc-100'}`}
+                        >
+                          PIN Numérico
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPasswordType('padrao')}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${passwordType === 'padrao' ? 'bg-zinc-900 text-white' : 'bg-white border border-zinc-200 text-zinc-600 hover:bg-zinc-100'}`}
+                        >
+                          Desenho (Padrão)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPasswordType('escrita')}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${passwordType === 'escrita' ? 'bg-zinc-900 text-white' : 'bg-white border border-zinc-200 text-zinc-600 hover:bg-zinc-100'}`}
+                        >
+                          Escrita (Texto)
+                        </button>
                       </div>
                       
-                      {/* Grid representation */}
-                      <div className="flex justify-center">
-                        <div className="grid grid-cols-3 gap-3 p-3 bg-white border border-zinc-200 rounded-xl w-32 justify-items-center">
-                          {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((dot) => {
-                            const sequenceList = patternLock ? patternLock.split('-') : [];
-                            const order = sequenceList.indexOf(dot.toString());
-                            const isActive = order !== -1;
-                            return (
-                              <button
-                                key={dot}
-                                type="button"
-                                onClick={() => togglePatternDot(dot)}
-                                className={`w-6 h-6 rounded-full flex items-center justify-center font-black text-[9px] transition-all cursor-pointer ${isActive ? 'bg-zinc-900 text-white scale-110 shadow-sm' : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-400'}`}
-                              >
-                                {isActive ? order + 1 : dot}
-                              </button>
-                            );
-                          })}
+                      {passwordType === 'padrao' && (
+                        <PatternLockWidget value={patternLock} onChange={setPatternLock} />
+                      )}
+
+                      {(passwordType === 'pin' || passwordType === 'escrita') && (
+                        <div className="w-full max-w-xs">
+                          <input
+                            type={passwordType === 'pin' ? 'number' : 'text'}
+                            value={passwordValue}
+                            onChange={(e) => setPasswordValue(e.target.value)}
+                            placeholder={passwordType === 'pin' ? 'Ex: 123456' : 'Ex: senha@123'}
+                            className="w-full px-3 py-2 border border-zinc-200 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-zinc-900 text-center font-mono"
+                          />
                         </div>
-                      </div>
+                      )}
                     </div>
                   )}
 
@@ -1100,7 +1611,7 @@ export default function ServiceOrders({
                         required
                         rows={2}
                         value={reportedDefect}
-                        onChange={(e) => setReportedDefect(e.target.value)}
+                        onChange={(e) => setReportedDefect(capitalizeSentences(e.target.value))}
                         className="w-full px-3 py-2 border border-zinc-200 rounded-xl text-xs resize-none"
                         placeholder="Ex: Não liga após queda."
                       />
@@ -1110,7 +1621,7 @@ export default function ServiceOrders({
                       <textarea
                         rows={2}
                         value={deviceObservations}
-                        onChange={(e) => setDeviceObservations(e.target.value)}
+                        onChange={(e) => setDeviceObservations(capitalizeSentences(e.target.value))}
                         className="w-full px-3 py-2 border border-zinc-200 rounded-xl text-xs resize-none"
                         placeholder="Ex: Riscos na parte traseira, película de vidro trincada."
                       />
@@ -1127,7 +1638,7 @@ export default function ServiceOrders({
                       <textarea
                         rows={3}
                         value={technicalDiagnosis}
-                        onChange={(e) => setTechnicalDiagnosis(e.target.value)}
+                        onChange={(e) => setTechnicalDiagnosis(capitalizeSentences(e.target.value))}
                         className="w-full px-3 py-2 border border-zinc-200 rounded-xl text-xs resize-none h-[155px]"
                         placeholder="Ex: Substituição da placa conector de carga efetuada."
                       />
@@ -1143,7 +1654,7 @@ export default function ServiceOrders({
                             type="text"
                             placeholder="Nome da peça encomendada"
                             value={partName}
-                            onChange={(e) => setPartName(e.target.value)}
+                            onChange={(e) => setPartName(capitalizeSentences(e.target.value))}
                             className="w-full px-2 py-1.5 border border-zinc-200 bg-white rounded-lg text-xs"
                           />
                         </div>
@@ -1328,7 +1839,7 @@ export default function ServiceOrders({
                     type="submit"
                     className="flex-1 py-2.5 px-4 bg-zinc-900 hover:bg-zinc-800 text-white rounded-xl text-xs font-semibold transition-all cursor-pointer"
                   >
-                    Salvar Ordem de Serviço
+                    {editingOS && hasChangesComputed ? 'Atualizar Ordem de Serviço' : 'Salvar Ordem de Serviço'}
                   </button>
                 </div>
               </form>
@@ -1396,224 +1907,208 @@ export default function ServiceOrders({
         )}
       </AnimatePresence>
 
-      {/* Recibo / Print OS Modal (TWO VIAS FITTING ON A SINGLE A4 SHEET) */}
+      {/* Visualização de Ordem de Serviço (PDF Mirror Layout) */}
       <AnimatePresence>
         {isPrintModalOpen && printOS && (
-          <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <div className="fixed inset-0 bg-black/45 backdrop-blur-xs flex items-center justify-center p-4 z-50">
             <motion.div
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white w-full max-w-3xl rounded-2xl border border-zinc-100 shadow-xl overflow-hidden"
+              className="bg-white w-full max-w-3xl rounded-2xl border border-zinc-200 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
             >
-              <div className="flex justify-between items-center bg-zinc-50 p-5 border-b border-zinc-100">
-                <h3 className="text-xs font-bold text-zinc-950 uppercase tracking-wider">Comprovante de Ordem de Serviço (A4 Duas Vias)</h3>
-                <button onClick={() => setIsPrintModalOpen(false)} className="p-1 hover:bg-zinc-200 text-zinc-400 hover:text-zinc-600 rounded-lg">
-                  <X size={20} />
+              <div className="flex justify-between items-center bg-zinc-50 px-6 py-4 border-b border-zinc-150">
+                <div className="text-left">
+                  <h3 className="text-xs font-black text-zinc-900 uppercase tracking-widest">Visualização da Ordem de Serviço</h3>
+                  <p className="text-[10px] text-zinc-400 font-bold mt-0.5">O.S. Nº {printOS.osNumber} | Cliente: {printOS.customerName}</p>
+                </div>
+                <button onClick={() => setIsPrintModalOpen(false)} className="p-1.5 hover:bg-zinc-200 text-zinc-400 hover:text-zinc-700 rounded-xl transition-colors cursor-pointer">
+                  <X size={18} />
                 </button>
               </div>
 
-              {/* TWO VIAS PRINT CONTAINER */}
-              <div className="p-6 overflow-y-auto max-h-[60vh] text-left" id="printable-ticket">
-                {/* VIA 1: CLIENT VIA */}
-                <div className="space-y-4 border-b-2 border-dashed border-zinc-300 pb-6 mb-6">
-                  <div className="flex justify-between items-start">
-                    <div className="flex items-center gap-3">
-                      {shopLogo ? (
-                        <img src={shopLogo} alt="Logo" className="w-10 h-10 object-contain" referrerPolicy="no-referrer" />
-                      ) : (
-                        <div className="w-10 h-10 bg-zinc-950 text-white rounded-lg flex items-center justify-center font-bold">OS</div>
-                      )}
-                      <div>
-                        <h4 className="text-xs font-black uppercase tracking-wider">{shopName || 'ASSISTÊNCIA TÉCNICA'}</h4>
-                        <p className="text-[8px] text-zinc-500">Contato: {shopPhone} | CNPJ/CPF: {shopCnpjCpf}</p>
-                        <p className="text-[8px] text-zinc-500">Email: {shopEmail || 'contato@suaempresa.com'}</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-[9px] font-black bg-zinc-100 border border-zinc-300 text-zinc-800 px-2 py-0.5 rounded-full uppercase tracking-wider">Via do Cliente</span>
-                      <p className="text-xs font-black text-zinc-950 mt-1">{printOS.osNumber}</p>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-2 text-[10px] text-zinc-700 bg-zinc-50 p-2.5 rounded-lg border border-zinc-150">
-                    <div>
-                      <span className="font-extrabold text-zinc-400 block text-[8px] uppercase">Cliente</span>
-                      <p className="font-bold text-zinc-900">{printOS.customerName}</p>
-                      <p className="text-[9px]">{formatPhone(printOS.customerPhone)}</p>
-                    </div>
-                    <div>
-                      <span className="font-extrabold text-zinc-400 block text-[8px] uppercase">Equipamento</span>
-                      <p className="font-bold text-zinc-900">{printOS.deviceName}</p>
-                      <p className="text-[9px] uppercase font-black">Tipo: {printOS.deviceType || 'Celular'}</p>
-                    </div>
-                    <div>
-                      <span className="font-extrabold text-zinc-400 block text-[8px] uppercase">Abertura</span>
-                      <p className="font-bold text-zinc-900">{formatDate(printOS.createdAt)}</p>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4 text-[10px] leading-relaxed">
-                    <div className="border border-zinc-200 p-2 rounded-lg">
-                      <span className="font-extrabold text-zinc-400 block text-[8px] uppercase">Defeito Relatado</span>
-                      <p className="text-zinc-800 italic">{printOS.reportedDefect}</p>
-                    </div>
-                    <div className="border border-zinc-200 p-2 rounded-lg">
-                      <span className="font-extrabold text-zinc-400 block text-[8px] uppercase">Laudo Técnico</span>
-                      <p className="text-zinc-800 font-medium">{printOS.technicalDiagnosis || 'Aguardando diagnóstico detalhado.'}</p>
-                    </div>
-                  </div>
-
-                  {/* Pricing / Payment & Signature */}
-                  <div className="grid grid-cols-3 gap-4 items-center pt-2">
-                    <div>
-                      <span className="font-extrabold text-zinc-400 block text-[8px] uppercase">Faturamento</span>
-                      <div className="flex items-center gap-1.5 mt-1">
-                        <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${printOS.paymentStatus === 'pago' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'}`}>
-                          {printOS.paymentStatus === 'pago' ? 'PAGO / RECEBIDO' : 'PAGAMENTO PENDENTE'}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div>
-                      <span className="font-extrabold text-zinc-400 block text-[8px] uppercase">Total da O.S.</span>
-                      <p className="text-sm font-black text-zinc-950 mt-0.5">{formatCurrency(printOS.totalAmount)}</p>
-                    </div>
-
-                    <div className="text-right">
-                      <span className="font-extrabold text-zinc-400 block text-[8px] uppercase">Acompanhe Online</span>
-                      <div className="flex items-center justify-end gap-1.5 mt-1">
-                        <span className="text-[9px] font-mono text-zinc-500 font-bold">{printOS.osNumber}</span>
-                        <QrCode size={18} className="text-zinc-400" />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Legal Terms & Warranty */}
-                  <div className="border border-zinc-150 rounded-lg p-2 bg-zinc-50/50 text-[6px] leading-tight text-zinc-500 font-medium">
-                    <p className="font-extrabold text-zinc-700 uppercase mb-0.5">Termos de Garantia & Condições de Atendimento</p>
-                    <ul className="list-disc list-inside space-y-0.5">
-                      <li><strong>Garantia Legal:</strong> Garantia de 90 dias sobre serviços realizados (Art. 26, II do Código de Defesa do Consumidor - Lei 8078/90).</li>
-                      <li><strong>Abandono de Equipamento:</strong> Conforme legislação civil, aparelhos prontos e não retirados após 90 dias serão considerados abandonados, podendo ser alienados pela oficina para custear peças e mão de obra.</li>
-                      <li><strong>Responsabilidade sobre Dados:</strong> Não nos responsabilizamos pela integridade de fotos, contatos, conversas e mídias do aparelho. É dever do cliente efetuar backup completo antes do início do reparo técnico.</li>
-                    </ul>
-                  </div>
-
-                  {/* Signatures placeholder */}
-                  <div className="grid grid-cols-2 gap-8 pt-4">
-                    <div className="border-t border-zinc-300 text-center pt-1 text-[8px] font-bold text-zinc-400 uppercase">
-                      Assinatura do Técnico
-                    </div>
-                    <div className="text-center pt-1 text-[8px] font-bold text-zinc-400 uppercase relative">
-                      {printOS.signature ? (
-                        <div className="absolute bottom-2 left-1/2 -translate-x-1/2 max-h-10">
-                          <img src={printOS.signature} alt="Assinatura" className="h-8 object-contain" referrerPolicy="no-referrer" />
+              {/* BRANDED PREVIEW CONTAINER (LOOKS LIKE THE PRINTED PDF) */}
+              <div className="p-6 overflow-y-auto bg-zinc-50/50 flex-1">
+                <div className="bg-white border border-zinc-200 shadow-sm max-w-2xl mx-auto rounded-xl overflow-hidden relative text-left">
+                  {/* Top brand line */}
+                  <div style={{ backgroundColor: config?.colors?.primary || '#18181b' }} className="h-1.5 w-full" />
+                  
+                  <div className="p-6 space-y-6">
+                    {/* Header */}
+                    <div className="flex flex-col sm:flex-row justify-between items-start gap-4 pb-4 border-b border-zinc-100">
+                      <div className="flex items-start gap-3">
+                        {shopLogo ? (
+                          <img src={shopLogo} alt="Logo" className="w-12 h-12 object-contain rounded-lg" referrerPolicy="no-referrer" />
+                        ) : (
+                          <div style={{ backgroundColor: config?.colors?.primary || '#18181b' }} className="w-12 h-12 text-white rounded-xl flex items-center justify-center font-black text-xl">OS</div>
+                        )}
+                        <div>
+                          <h4 className="text-sm font-extrabold text-zinc-900 uppercase tracking-tight">{shopName || 'INFO_CAM TECNOLOGIA'}</h4>
+                          <p className="text-[10px] text-zinc-400 font-bold">CNPJ/CPF: {shopCnpjCpf || 'N/A'}</p>
+                          <p className="text-[10px] text-zinc-400 font-bold">Contato: {formatPhone(shopPhone || '')} | Email: {shopEmail || 'N/A'}</p>
                         </div>
-                      ) : (
-                        <div className="border-t border-zinc-300 w-full mb-1"></div>
-                      )}
-                      Assinatura do Cliente
-                    </div>
-                  </div>
-                </div>
-
-                {/* VIA 2: SHOP VIA (VIA DA LOJA) */}
-                <div className="space-y-4">
-                  <div className="flex justify-between items-start">
-                    <div className="flex items-center gap-3">
-                      {shopLogo ? (
-                        <img src={shopLogo} alt="Logo" className="w-10 h-10 object-contain" referrerPolicy="no-referrer" />
-                      ) : (
-                        <div className="w-10 h-10 bg-zinc-950 text-white rounded-lg flex items-center justify-center font-bold">OS</div>
-                      )}
-                      <div>
-                        <h4 className="text-xs font-black uppercase tracking-wider">{shopName || 'ASSISTÊNCIA TÉCNICA'}</h4>
-                        <p className="text-[8px] text-zinc-500">Contato: {shopPhone} | CNPJ/CPF: {shopCnpjCpf}</p>
+                      </div>
+                      
+                      {/* Doc metadata panel */}
+                      <div className="bg-zinc-50 border border-zinc-200 rounded-xl p-3 w-full sm:w-48 text-left space-y-1">
+                        <span className="text-[9px] font-black uppercase text-zinc-400 tracking-wider">Documento Oficial</span>
+                        <h5 className="text-xs font-black text-zinc-900 font-sans">ORDEM DE SERVIÇO</h5>
+                        <p className="text-sm font-black" style={{ color: config?.colors?.primary || '#18181b' }}>Nº {printOS.osNumber}</p>
+                        <p className="text-[9px] text-zinc-400">Abertura: {formatDate(printOS.createdAt)}</p>
+                        <p className="text-[9px] text-zinc-400 font-bold uppercase">Status: {STATUS_OPTIONS.find(s => s.value === printOS.status)?.label || printOS.status}</p>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <span className="text-[9px] font-black bg-zinc-100 border border-zinc-300 text-zinc-800 px-2 py-0.5 rounded-full uppercase tracking-wider">Via da Oficina</span>
-                      <p className="text-xs font-black text-zinc-950 mt-1">{printOS.osNumber}</p>
-                    </div>
-                  </div>
 
-                  <div className="grid grid-cols-3 gap-2 text-[10px] text-zinc-700 bg-zinc-50 p-2.5 rounded-lg border border-zinc-150">
-                    <div>
-                      <span className="font-extrabold text-zinc-400 block text-[8px] uppercase">Cliente</span>
-                      <p className="font-bold text-zinc-900">{printOS.customerName}</p>
-                      <p className="text-[9px]">{formatPhone(printOS.customerPhone)}</p>
-                    </div>
-                    <div>
-                      <span className="font-extrabold text-zinc-400 block text-[8px] uppercase">Aparelho</span>
-                      <p className="font-bold text-zinc-900">{printOS.deviceName}</p>
-                      <p className="text-[9px] font-mono text-zinc-500">SN: {printOS.serialNumber || 'N/A'}</p>
-                    </div>
-                    <div>
-                      <span className="font-extrabold text-zinc-400 block text-[8px] uppercase">Senha do Aparelho</span>
-                      <p className="font-bold text-zinc-950 bg-white border px-1.5 py-0.5 rounded max-w-max text-[9px]">
-                        {printOS.patternLock ? `Padrão: ${printOS.patternLock}` : 'Sem senha'}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4 text-[10px]">
-                    <div className="border border-zinc-200 p-2 rounded-lg">
-                      <span className="font-extrabold text-zinc-400 block text-[8px] uppercase">Defeito e Diagnóstico</span>
-                      <p className="font-bold text-zinc-900">Defeito: <span className="font-normal italic text-zinc-700">{printOS.reportedDefect}</span></p>
-                      <p className="font-bold text-zinc-900 mt-1">Solução: <span className="font-normal text-zinc-700">{printOS.technicalDiagnosis || 'Não informado.'}</span></p>
-                    </div>
-                    <div className="border border-zinc-200 p-2 rounded-lg space-y-1 bg-zinc-50/50">
-                      <span className="font-extrabold text-zinc-400 block text-[8px] uppercase">Custos & Internos</span>
-                      <p className="text-zinc-600">Serviço/Mão de obra: <span className="font-bold text-zinc-800">{formatCurrency(printOS.priceLabor)}</span></p>
-                      <p className="text-zinc-600">Peças aplicadas: <span className="font-bold text-zinc-800">{formatCurrency(printOS.priceParts)}</span></p>
-                      <p className="text-[9px] text-zinc-500 italic mt-1 bg-white p-1 rounded border border-zinc-100">Obs: {printOS.deviceObservations || 'Nenhuma observação estática cadastrada.'}</p>
-                    </div>
-                  </div>
-
-                  {/* Legal Terms & Warranty */}
-                  <div className="border border-zinc-150 rounded-lg p-2 bg-zinc-50/50 text-[6px] leading-tight text-zinc-500 font-medium">
-                    <p className="font-extrabold text-zinc-700 uppercase mb-0.5">Termos de Garantia & Condições de Atendimento</p>
-                    <ul className="list-disc list-inside space-y-0.5">
-                      <li><strong>Garantia Legal:</strong> Garantia de 90 dias sobre serviços realizados (Art. 26, II do Código de Defesa do Consumidor - Lei 8078/90).</li>
-                      <li><strong>Abandono de Equipamento:</strong> Conforme legislação civil, aparelhos prontos e não retirados após 90 dias serão considerados abandonados, podendo ser alienados pela oficina para custear peças e mão de obra.</li>
-                      <li><strong>Responsabilidade sobre Dados:</strong> Não nos responsabilizamos pela integridade de fotos, contatos, conversas e mídias do aparelho. É dever do cliente efetuar backup completo antes do início do reparo técnico.</li>
-                    </ul>
-                  </div>
-
-                  {/* Signatures placeholder */}
-                  <div className="grid grid-cols-2 gap-8 pt-4">
-                    <div className="border-t border-zinc-300 text-center pt-1 text-[8px] font-bold text-zinc-400 uppercase">
-                      Técnico Responsável
-                    </div>
-                    <div className="text-center pt-1 text-[8px] font-bold text-zinc-400 uppercase relative">
-                      {printOS.signature ? (
-                        <div className="absolute bottom-2 left-1/2 -translate-x-1/2 max-h-10">
-                          <img src={printOS.signature} alt="Assinatura" className="h-8 object-contain" referrerPolicy="no-referrer" />
+                    {/* Section 1: Cliente */}
+                    <div className="space-y-2">
+                      <div style={{ backgroundColor: config?.colors?.primary || '#18181b' }} className="px-3 py-1 rounded-xs text-white text-[10px] font-black uppercase tracking-wider">
+                        Dados do Cliente
+                      </div>
+                      <div className="border rounded-xl p-3 bg-white grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+                        <div>
+                          <p className="text-zinc-400 font-bold">Nome: <span className="text-zinc-900 font-black">{printOS.customerName}</span></p>
+                          {printOS.customerCpfCnpj && (
+                            <p className="text-zinc-400 font-bold mt-1">CPF/CNPJ: <span className="text-zinc-900 font-black">{printOS.customerCpfCnpj}</span></p>
+                          )}
+                          <p className="text-zinc-400 font-bold mt-1">Telefone: <span className="text-zinc-900 font-black">{formatPhone(printOS.customerPhone)}</span></p>
+                          <p className="text-zinc-400 font-bold mt-1">Email: <span className="text-zinc-900 font-semibold">{printOS.customerEmail || 'Não informado'}</span></p>
                         </div>
-                      ) : (
-                        <div className="border-t border-zinc-300 w-full mb-1"></div>
-                      )}
-                      Autorização do Cliente
+                        <div className="md:border-l md:pl-3">
+                          <p className="text-zinc-400 font-bold">Endereço:</p>
+                          <p className="text-zinc-800 font-medium mt-0.5">{printOS.customerAddress || 'Não informado'}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Section 2: Device */}
+                    <div className="space-y-2">
+                      <div style={{ backgroundColor: config?.colors?.primary || '#18181b' }} className="px-3 py-1 rounded-xs text-white text-[10px] font-black uppercase tracking-wider">
+                        Especificações do Equipamento
+                      </div>
+                      <div className="border rounded-xl p-3 bg-white grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+                        <div>
+                          <p className="text-zinc-400 font-bold">Equipamento: <span className="text-zinc-900 font-black">{printOS.deviceName}</span></p>
+                          <p className="text-zinc-400 font-bold mt-1">Tipo de Aparelho: <span className="text-zinc-900 font-semibold">{printOS.deviceType || 'Celular'}</span></p>
+                          <p className="text-zinc-400 font-bold mt-1">Nº de Série/IMEI: <span className="text-zinc-900 font-mono font-bold">{printOS.serialNumber || 'N/A'}</span></p>
+                        </div>
+                        <div className="md:border-l md:pl-3 flex flex-col justify-center">
+                          {['celular', 'tablet', 'celulares', 'tablets', 'smartphone', 'smartphones'].includes((printOS.deviceType || '').toLowerCase()) ? (
+                            <div>
+                              <p className="text-zinc-400 font-bold">Senha de Desbloqueio:</p>
+                              <span className="inline-block mt-1 font-black text-rose-600 bg-rose-50 border border-rose-100 px-2.5 py-0.5 rounded text-xs">
+                                {(printOS.passwordType === 'padrao' || !printOS.passwordType) 
+                                  ? (printOS.patternLock ? `Padrão: ${printOS.patternLock}` : 'Não informada')
+                                  : `${printOS.passwordType === 'pin' ? 'PIN' : 'Escrita'}: ${printOS.passwordValue || 'Não informada'}`
+                                }
+                              </span>
+                            </div>
+                          ) : (
+                            <p className="text-zinc-400 font-bold italic">Senha Ocultada (Dispositivo s/ tela)</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Section 3: Defeito e Diagnostico */}
+                    <div className="space-y-2">
+                      <div style={{ backgroundColor: config?.colors?.primary || '#18181b' }} className="px-3 py-1 rounded-xs text-white text-[10px] font-black uppercase tracking-wider">
+                        Defeito Reclamado & Diagnóstico Técnico
+                      </div>
+                      <div className="border rounded-xl p-3 bg-white space-y-3 text-xs text-left">
+                        <div>
+                          <p className="text-zinc-400 font-bold uppercase text-[9px] tracking-wider">Defeito relatado pelo cliente</p>
+                          <p className="text-zinc-800 italic font-medium mt-1 bg-zinc-50 p-2 rounded-lg border border-zinc-100">{printOS.reportedDefect || 'Sem defeito relatado.'}</p>
+                        </div>
+                        <div>
+                          <p className="text-zinc-400 font-bold uppercase text-[9px] tracking-wider">Diagnóstico e solução técnica</p>
+                          <p className="text-zinc-800 font-bold mt-1 bg-zinc-50 p-2 rounded-lg border border-zinc-100">{printOS.technicalDiagnosis || 'Aguardando avaliação técnica.'}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Section 4: Financeiro */}
+                    <div className="space-y-2">
+                      <div style={{ backgroundColor: config?.colors?.primary || '#18181b' }} className="px-3 py-1 rounded-xs text-white text-[10px] font-black uppercase tracking-wider">
+                        Valores e Situação de Faturamento
+                      </div>
+                      <div className="border rounded-xl p-4 bg-zinc-50/50 grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs items-center">
+                        <div className="space-y-1.5">
+                          <p className="text-zinc-500 font-bold flex justify-between">Mão de Obra / Serviços: <span className="text-zinc-950 font-extrabold">{formatCurrency(printOS.priceLabor)}</span></p>
+                          <p className="text-zinc-500 font-bold flex justify-between">Peças / Componentes: <span className="text-zinc-950 font-extrabold">{formatCurrency(printOS.priceParts)}</span></p>
+                        </div>
+                        <div className="sm:border-l sm:pl-4 space-y-1 text-center sm:text-left">
+                          <p className="text-[10px] font-black text-zinc-400 uppercase tracking-wider">Faturamento Total</p>
+                          <p className="text-lg font-black" style={{ color: config?.colors?.primary || '#18181b' }}>{formatCurrency(printOS.totalAmount)}</p>
+                          <div className="mt-1">
+                            {printOS.paymentStatus === 'pago' ? (
+                              <span className="inline-block text-[10px] font-black px-2.5 py-0.5 bg-emerald-100 text-emerald-800 rounded-full border border-emerald-200 uppercase">
+                                PAGO / RECEBIDO
+                              </span>
+                            ) : (
+                              <span className="inline-block text-[10px] font-black px-2.5 py-0.5 bg-amber-100 text-amber-800 rounded-full border border-amber-200 uppercase">
+                                PENDENTE / EM ABERTO
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Section 5: Observacoes e Termos */}
+                    <div className="space-y-2">
+                      <div style={{ backgroundColor: config?.colors?.primary || '#18181b' }} className="px-3 py-1 rounded-xs text-white text-[10px] font-black uppercase tracking-wider">
+                        Termos de Serviço & Observações
+                      </div>
+                      <div className="border rounded-xl p-3 bg-zinc-50/50 space-y-1.5 text-[8px] leading-relaxed text-zinc-400 font-medium">
+                        <p>1. Os serviços prestados possuem garantia legal de 90 dias a contar da data de entrega do equipamento.</p>
+                        <p>2. Aparelhos prontos e não retirados em até 90 dias úteis estarão sujeitos à venda pública para custeio dos custos de reparo, insumos e armazenamento.</p>
+                        <p>3. A garantia cobre apenas os defeitos reparados descritos no presente laudo técnico, não se aplicando a outros componentes ou avarias futuras.</p>
+                        {printOS.deviceObservations && (
+                          <div className="pt-2 text-[9px] text-zinc-600 font-bold uppercase">
+                            OBSERVAÇÕES ADICIONAIS: {printOS.deviceObservations}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Signatures */}
+                    <div className="grid grid-cols-2 gap-6 pt-6 text-[10px] text-zinc-400 font-bold">
+                      <div className="text-center">
+                        <div className="border-t border-zinc-200 pt-1.5 uppercase">Técnico Responsável</div>
+                      </div>
+                      <div className="text-center relative">
+                        {printOS.signature && printOS.signature.startsWith('data:image') && (
+                          <img src={printOS.signature} alt="Assinatura" className="absolute bottom-5 left-1/2 -translate-x-1/2 h-8 object-contain" referrerPolicy="no-referrer" />
+                        )}
+                        <div className="border-t border-zinc-200 pt-1.5 uppercase">Assinatura do Cliente</div>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
 
               {/* Controls */}
-              <div className="p-4 bg-zinc-50 border-t border-zinc-100 flex gap-2">
+              <div className="p-4 bg-zinc-50 border-t border-zinc-150 flex flex-col sm:flex-row gap-2">
                 <button
+                  type="button"
                   onClick={() => setIsPrintModalOpen(false)}
-                  className="flex-1 py-2 px-4 bg-zinc-200 hover:bg-zinc-300 text-zinc-700 text-xs font-bold rounded-lg cursor-pointer"
+                  className="flex-1 py-2.5 px-4 bg-zinc-200 hover:bg-zinc-300 text-zinc-700 text-xs font-bold rounded-xl transition-colors cursor-pointer"
                 >
                   Fechar
                 </button>
                 <button
-                  onClick={() => {
-                    window.print();
-                  }}
-                  className="flex-1 py-2 px-4 bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 cursor-pointer"
+                  type="button"
+                  onClick={() => sendWhatsApp(printOS)}
+                  className="flex-1 py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
                 >
-                  <Printer size={14} /> Imprimir Ambas Vias
+                  <Share2 size={14} /> Enviar via WhatsApp
+                </button>
+                <button
+                  type="button"
+                  onClick={() => generateAndSaveOSPDF(printOS)}
+                  className="flex-1 py-2.5 px-4 bg-zinc-950 hover:bg-zinc-800 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <Download size={14} /> Baixar PDF Oficial
                 </button>
               </div>
             </motion.div>
@@ -1672,7 +2167,7 @@ export default function ServiceOrders({
                   <textarea
                     rows={3}
                     value={finalizationObservation}
-                    onChange={(e) => setFinalizationObservation(e.target.value)}
+                    onChange={(e) => setFinalizationObservation(capitalizeSentences(e.target.value))}
                     placeholder="Descreva o motivo da devolução, laudo de não conserto ou observações finais..."
                     className="w-full px-3 py-2 border border-zinc-200 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-zinc-900"
                     required={
@@ -1740,6 +2235,126 @@ export default function ServiceOrders({
                   </button>
                 </div>
               </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* OS Salva / Finalizada Prompt */}
+      <AnimatePresence>
+        {isSavedPromptOpen && savedOSForPrompt && (
+          <div className="fixed inset-0 bg-black/45 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white w-full max-w-md rounded-2xl border border-zinc-150 shadow-2xl overflow-hidden p-6 text-center space-y-5"
+            >
+              <div className="mx-auto w-12 h-12 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center">
+                <CheckCircle size={24} />
+              </div>
+              <div className="space-y-1.5 text-center">
+                <h3 className="text-sm font-black text-zinc-950 font-sans">Ordem de Serviço Processada!</h3>
+                <p className="text-xs text-zinc-500 font-medium">
+                  A O.S. <strong className="text-zinc-900 font-bold">#{savedOSForPrompt.osNumber}</strong> foi salva com sucesso no sistema. O que você deseja fazer agora?
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsSavedPromptOpen(false);
+                    generateAndSaveOSPDF(savedOSForPrompt);
+                    setSavedOSForPrompt(null);
+                  }}
+                  className="w-full py-2.5 px-4 bg-zinc-950 hover:bg-zinc-800 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <Download size={14} /> Baixar PDF Oficial
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsSavedPromptOpen(false);
+                    setPrintOS(savedOSForPrompt);
+                    setIsPrintModalOpen(true);
+                    setSavedOSForPrompt(null);
+                  }}
+                  className="w-full py-2.5 px-4 bg-zinc-100 hover:bg-zinc-200 text-zinc-800 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <ExternalLink size={14} /> Apenas Abrir Visualização
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsSavedPromptOpen(false);
+                    setSavedOSForPrompt(null);
+                  }}
+                  className="w-full py-2.5 px-4 bg-zinc-50 hover:bg-zinc-100 text-zinc-400 hover:text-zinc-500 text-xs font-bold rounded-xl transition-colors cursor-pointer"
+                >
+                  Fechar
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Confirmar Impressão OS Modal */}
+      <AnimatePresence>
+        {isConfirmPrintModalOpen && confirmPrintOS && (
+          <div className="fixed inset-0 bg-black/45 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white w-full max-w-md rounded-2xl border border-zinc-150 shadow-2xl overflow-hidden p-6 text-center space-y-5"
+            >
+              <div className="mx-auto w-12 h-12 bg-amber-50 text-amber-600 rounded-full flex items-center justify-center">
+                <Printer size={24} />
+              </div>
+              <div className="space-y-1.5 text-center">
+                <h3 className="text-sm font-black text-zinc-950 font-sans">Imprimir Ordem de Serviço</h3>
+                <p className="text-xs text-zinc-500 font-medium">
+                  Deseja baixar o PDF oficial com o design personalizado da O.S. <strong className="text-zinc-900 font-bold">#{confirmPrintOS.osNumber}</strong>?
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsConfirmPrintModalOpen(false);
+                    generateAndSaveOSPDF(confirmPrintOS);
+                    setConfirmPrintOS(null);
+                  }}
+                  className="w-full py-2.5 px-4 bg-zinc-950 hover:bg-zinc-800 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <Download size={14} /> Sim, Baixar PDF
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsConfirmPrintModalOpen(false);
+                    setPrintOS(confirmPrintOS);
+                    setIsPrintModalOpen(true);
+                    setConfirmPrintOS(null);
+                  }}
+                  className="w-full py-2.5 px-4 bg-zinc-100 hover:bg-zinc-200 text-zinc-800 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <ExternalLink size={14} /> Apenas Visualizar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsConfirmPrintModalOpen(false);
+                    setConfirmPrintOS(null);
+                  }}
+                  className="w-full py-2.5 px-4 bg-zinc-50 hover:bg-zinc-100 text-zinc-400 hover:text-zinc-500 text-xs font-bold rounded-xl transition-colors cursor-pointer"
+                >
+                  Cancelar
+                </button>
+              </div>
             </motion.div>
           </div>
         )}

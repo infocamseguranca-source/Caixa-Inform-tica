@@ -17,7 +17,8 @@ import {
   Settings,
   Download,
   FileSpreadsheet,
-  Lock
+  Lock,
+  MessageCircle
 } from 'lucide-react';
 import { 
   collection, 
@@ -28,6 +29,7 @@ import {
   deleteDoc, 
   writeBatch, 
   query,
+  getDocs,
   setDoc,
   where
 } from 'firebase/firestore';
@@ -36,6 +38,7 @@ import { db, auth, googleSignIn, logout, getAccessToken } from './firebase';
 import { Transaction, ServiceOrder, BackupHistory, Product, Staff, Appointment, ShopConfig, EquipmentPurchase, Customer } from './types';
 import { generateOSNumber, exportToExcel } from './utils';
 import { motion, AnimatePresence } from 'motion/react';
+import seedData from './seed.json';
 
 // Import components
 import Dashboard from './components/Dashboard';
@@ -46,6 +49,7 @@ import Products from './components/Products';
 import PDV from './components/PDV';
 import Appointments from './components/Appointments';
 import SettingsShop from './components/SettingsShop';
+import WhatsAppWeb from './components/WhatsAppWeb';
 import EquipmentPurchases from './components/EquipmentPurchases';
 import Customers from './components/Customers';
 
@@ -187,7 +191,17 @@ const DEFAULT_CONFIG: ShopConfig = {
   finalizationOptions: ['Pronto para Retirada', 'Retirado Sem Reparo', 'Devolvido ao Cliente', 'Entregue para outra Assistência', 'Sem Conserto / Descarte'],
   purchaseCategories: ['Informatica', 'Celulares'],
   purchaseEquipmentTypes: ['Computador', 'Notebook', 'Celular', 'Tablet', 'Monitor', 'Impressora', 'Outros'],
-  enablePurchaseSignature: true
+  productTypes: ['Capa', 'Película', 'Carregador', 'Cabo', 'Fone', 'Aparelho', 'Outros'],
+  enablePurchaseSignature: true,
+  whatsappMessages: {
+    aguardando: 'Olá, {nome}. A sua OS {os} está atualizada como *{status}*. Estamos aguardando a sua autorização para o serviço. Obrigado pela preferência!!!',
+    aprovado: 'Olá, {nome}. A sua OS {os} está atualizada como *{status}*. Seu orçamento foi aprovado. Obrigado pela preferência!!!',
+    em_reparo: 'Olá, {nome}. A sua OS {os} está atualizada como *{status}*. Seu equipamento está em manutenção. Obrigado pela preferência!!!',
+    pronto: 'Olá, {nome}. A sua OS {os} está atualizada como *{status}*. O seu aparelho já está pronto para a entrega. Obrigado pela preferência!!!',
+    entregue: 'Olá, {nome}. A sua OS {os} está atualizada como *{status}*. Esperamos que tenha tido uma ótima experiência. Obrigado pela preferência!!!',
+    default: 'Olá, {nome}. A sua OS {os} está atualizada como *{status}*. Obrigado pela preferência!!!',
+    appointment: 'Olá, {nome}. Aqui é da Assistência Técnica.\n\nEste é um lembrete do seu agendamento para o serviço de *{servico}*.\n\n📅 *Data/Hora:* {data}\n⚙️ *Técnico:* {tecnico}\n\nObrigado por escolher nossa assistência!'
+  }
 };
 
 export default function App() {
@@ -215,6 +229,50 @@ export default function App() {
   const [shopConfig, setShopConfig] = useState<ShopConfig>(DEFAULT_CONFIG);
   
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (user && seedData && seedData.length > 0 && !localStorage.getItem('seeded_xlsx_v3')) {
+      const seedIt = async () => {
+        try {
+          const q = query(collection(db, 'transactions'), where('ownerId', '==', user.uid));
+          const snapshot = await getDocs(q);
+          const batchDelete = writeBatch(db);
+          let countDel = 0;
+          snapshot.forEach(doc => {
+             if (doc.data().category === '') {
+               batchDelete.delete(doc.ref);
+               countDel++;
+             }
+          });
+          if (countDel > 0) {
+            await batchDelete.commit();
+            console.log(`Deleted ${countDel} old seed transactions.`);
+          }
+
+          const batch = writeBatch(db);
+          let countAdd = 0;
+          seedData.forEach((item) => {
+             const transRef = doc(collection(db, 'transactions'));
+             batch.set(transRef, { 
+               ...item, 
+               ownerId: user.uid,
+               amount: Number(item.amount),
+               date: item.date
+             });
+             countAdd++;
+             // Firestore limit is 500 writes per batch. 
+             // We have around 305 elements so it fits in a single batch.
+          });
+          await batch.commit();
+          localStorage.setItem('seeded_xlsx_v3', 'true');
+          console.log(`Seeded ${countAdd} XLSX transactions successfully!`);
+        } catch (e) {
+          console.error(e);
+        }
+      };
+      seedIt();
+    }
+  }, [user]);
 
   // Mobile sidebar toggle
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -523,40 +581,42 @@ export default function App() {
       // Seed Transactions
       SAMPLE_TRANSACTIONS.forEach((item) => {
         const transRef = doc(collection(db, 'transactions'));
-        batch.set(transRef, item);
+        batch.set(transRef, cleanPayload({ ...item, ownerId: user.uid }));
       });
 
       // Seed OSs
       SAMPLE_SERVICE_ORDERS.forEach((item) => {
         const osRef = doc(collection(db, 'service_orders'));
-        batch.set(osRef, {
+        batch.set(osRef, cleanPayload({
           ...item,
+          ownerId: user.uid,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
-        });
+        }));
       });
 
       // Seed Products
       SAMPLE_PRODUCTS.forEach((item) => {
         const prodRef = doc(collection(db, 'products'));
-        batch.set(prodRef, item);
+        batch.set(prodRef, cleanPayload({ ...item, ownerId: user.uid }));
       });
 
       // Seed Staff members
       SAMPLE_STAFF.forEach((item) => {
         const staffRef = doc(collection(db, 'staff'));
-        batch.set(staffRef, item);
+        batch.set(staffRef, cleanPayload({ ...item, ownerId: user.uid }));
       });
 
       // Seed dynamic config
-      const configRef = doc(db, 'shop_config', 'config');
-      batch.set(configRef, DEFAULT_CONFIG);
+      const configRef = doc(db, 'shop_config', user.uid);
+      batch.set(configRef, cleanPayload(DEFAULT_CONFIG));
 
       await batch.commit();
       alert('Dados de demonstração populados com sucesso no Firebase!');
     } catch (err) {
       console.error('Failed to seed samples:', err);
       alert('Erro ao popular dados de demonstração.');
+      handleFirestoreError(err, 'write', 'batch_seed');
     } finally {
       setLoading(false);
     }
@@ -601,45 +661,46 @@ export default function App() {
       if (backupData.transactions) {
         backupData.transactions.forEach((t) => {
           const { id, ...cleanT } = t;
-          batchWrite.set(doc(collection(db, 'transactions')), cleanT);
+          batchWrite.set(doc(collection(db, 'transactions')), cleanPayload({ ...cleanT, ownerId: user.uid }));
         });
       }
 
       if (backupData.serviceOrders) {
         backupData.serviceOrders.forEach((os) => {
           const { id, ...cleanOS } = os;
-          batchWrite.set(doc(collection(db, 'service_orders')), cleanOS);
+          batchWrite.set(doc(collection(db, 'service_orders')), cleanPayload({ ...cleanOS, ownerId: user.uid }));
         });
       }
 
       if (backupData.products) {
         backupData.products.forEach((p) => {
           const { id, ...cleanP } = p;
-          batchWrite.set(doc(collection(db, 'products')), cleanP);
+          batchWrite.set(doc(collection(db, 'products')), cleanPayload({ ...cleanP, ownerId: user.uid }));
         });
       }
 
       if (backupData.staff) {
         backupData.staff.forEach((st) => {
           const { id, ...cleanSt } = st;
-          batchWrite.set(doc(collection(db, 'staff')), cleanSt);
+          batchWrite.set(doc(collection(db, 'staff')), cleanPayload({ ...cleanSt, ownerId: user.uid }));
         });
       }
 
       if (backupData.appointments) {
         backupData.appointments.forEach((app) => {
           const { id, ...cleanApp } = app;
-          batchWrite.set(doc(collection(db, 'appointments')), cleanApp);
+          batchWrite.set(doc(collection(db, 'appointments')), cleanPayload({ ...cleanApp, ownerId: user.uid }));
         });
       }
 
       if (backupData.config) {
-        batchWrite.set(doc(db, 'shop_config', 'config'), backupData.config);
+        batchWrite.set(doc(db, 'shop_config', user.uid), cleanPayload(backupData.config));
       }
 
       await batchWrite.commit();
     } catch (err) {
       console.error(err);
+      handleFirestoreError(err, 'write', 'batch_restore');
       throw err;
     } finally {
       setLoading(false);
@@ -672,6 +733,22 @@ export default function App() {
     await deleteDoc(doc(db, 'transactions', id));
   };
 
+  // Standardized Firestore Error Handler for Zero-Trust and Security Auditing
+  const handleFirestoreError = (error: unknown, operationType: 'create' | 'update' | 'delete' | 'list' | 'get' | 'write', path: string | null) => {
+    const errInfo = {
+      error: error instanceof Error ? error.message : String(error),
+      operationType,
+      path,
+      authInfo: {
+        userId: user?.uid || null,
+        email: user?.email || null,
+        emailVerified: user?.emailVerified || null,
+      }
+    };
+    console.error('Firestore Error Info: ', JSON.stringify(errInfo));
+    throw new Error(JSON.stringify(errInfo));
+  };
+
   // Utility to remove undefined values recursively for safe Firestore updates
   const cleanPayload = (obj: any): any => {
     if (obj === undefined) return null;
@@ -699,7 +776,20 @@ export default function App() {
       setShowAuthModal(true);
       return { id: `fake-${Date.now()}`, osNumber: 'OS-TEMP', createdAt: '', updatedAt: '', status: 'aguardando', totalAmount: 0, paymentStatus: 'pendente', ...item } as any;
     }
-    const osNumber = generateOSNumber();
+    
+    // Find the max OS number from existing ones to ensure sequential numbering
+    let maxOSNum = 0;
+    serviceOrders.forEach(os => {
+      const match = os.osNumber?.match(/^OS-(\d+)$/);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (num > maxOSNum) maxOSNum = num;
+      }
+    });
+    // If no existing numbered OS found, default to length. If there is, increment max.
+    const baseCount = maxOSNum > 0 ? maxOSNum : serviceOrders.length;
+    
+    const osNumber = generateOSNumber(baseCount);
     const osPayload = {
       ...item,
       osNumber,
@@ -766,7 +856,7 @@ export default function App() {
   // CRUD Product Operations
   const handleAddProduct = async (item: Omit<Product, 'id'>) => {
     if (!checkAuth('Para cadastrar novos produtos no estoque real, conecte sua conta do Google.')) return;
-    await addDoc(collection(db, 'products'), cleanPayload({ ...item, ownerId: user.uid }));
+    await addDoc(collection(db, 'products'), cleanPayload({ ...item, createdAt: new Date().toISOString(), ownerId: user.uid }));
   };
 
   const handleEditProduct = async (id: string, updatedFields: Partial<Product>) => {
@@ -783,6 +873,11 @@ export default function App() {
   const handleAddStaff = async (item: Omit<Staff, 'id'>) => {
     if (!checkAuth('Para cadastrar novos membros da equipe real, conecte sua conta do Google.')) return;
     await addDoc(collection(db, 'staff'), cleanPayload({ ...item, ownerId: user.uid }));
+  };
+
+  const handleEditStaff = async (id: string, updatedFields: Partial<Staff>) => {
+    if (!checkAuth('Para editar membros da equipe real, conecte sua conta do Google.')) return;
+    await updateDoc(doc(db, 'staff', id), cleanPayload(updatedFields));
   };
 
   const handleDeleteStaff = async (id: string) => {
@@ -851,6 +946,12 @@ export default function App() {
   }) => {
     if (!checkAuth('Para registrar vendas reais no PDV, conecte sua conta do Google.')) return;
     const desc = `Venda PDV - ${saleData.items.map(i => `${i.qty}x ${i.product.name}`).join(', ')}`;
+    
+    // Calculate total cost from items that have a cost price
+    const totalCost = saleData.items.reduce((sum, i) => {
+      return sum + (i.product.costPrice ? i.product.costPrice * i.qty : 0);
+    }, 0);
+
     const transactionPayload = {
       description: desc.substring(0, 150) + (desc.length > 150 ? '...' : ''),
       amount: saleData.total,
@@ -859,23 +960,34 @@ export default function App() {
       paymentMethod: saleData.paymentMethod,
       date: new Date().toISOString(),
       sellerId: saleData.sellerId || null,
-      technicianId: saleData.technicianId || null
+      technicianId: saleData.technicianId || null,
+      cost: totalCost > 0 ? totalCost : undefined,
+      items: saleData.items.map(i => ({ 
+        product: { id: i.product.id, name: i.product.name, price: i.product.price, costPrice: i.product.costPrice }, 
+        qty: i.qty 
+      }))
     };
 
     try {
       const batch = writeBatch(db);
       const transRef = doc(collection(db, 'transactions'));
       batch.set(transRef, cleanPayload({ ...transactionPayload, ownerId: user.uid }));
+      
       saleData.items.forEach(item => {
-        const prodRef = doc(db, 'products', item.product.id);
-        const newStock = Math.max(0, item.product.stock - item.qty);
-        batch.update(prodRef, { stock: newStock });
+        // Only update stock in Firestore for real products that belong to the user and exist in Firestore
+        const existsInFirestore = products.some(p => p.id === item.product.id);
+        if (existsInFirestore && item.product.id) {
+          const prodRef = doc(db, 'products', item.product.id);
+          const newStock = Math.max(0, (item.product.stock || 0) - item.qty);
+          batch.update(prodRef, { stock: newStock });
+        }
       });
+      
       await batch.commit();
       alert('Venda registrada no PDV com sucesso!');
     } catch (err) {
       console.error('Erro ao processar venda no PDV:', err);
-      throw err;
+      handleFirestoreError(err, 'write', 'vendas_pdv');
     }
   };
 
@@ -892,6 +1004,7 @@ export default function App() {
       case 'agendamentos': return <Calendar size={size} />;
       case 'backup': return <Cloud size={size} />;
       case 'settings_shop': return <Settings size={size} />;
+      case 'whatsapp': return <MessageCircle size={size} />;
       default: return <Computer size={size} />;
     }
   };
@@ -908,13 +1021,14 @@ export default function App() {
       case 'agendamentos': return 'Agendamentos';
       case 'backup': return 'Drive & Backup';
       case 'settings_shop': return 'Configurações';
+      case 'whatsapp': return 'WhatsApp Web';
       default: return id;
     }
   };
 
   // Ensure current tab is valid or fallback to dashboard
   const validTabs = shopConfig.menuOrder || DEFAULT_CONFIG.menuOrder;
-  const currentMenuOrder = validTabs;
+  const currentMenuOrder = validTabs.includes('whatsapp') ? validTabs : [...validTabs, 'whatsapp'];
 
   // Loading indicator on auth initialize
   if (loading) {
@@ -1265,6 +1379,8 @@ export default function App() {
                 onDeleteTransaction={handleDeleteTransaction}
                 categories={shopConfig.categories}
                 onExportExcel={exportToExcel}
+                config={shopConfig}
+                staffList={staffList}
               />
             )}
 
@@ -1274,10 +1390,17 @@ export default function App() {
                 staffList={staffList}
                 transactions={transactions}
                 onAddProduct={handleAddProduct}
+                onAddTransaction={handleAddTransaction}
+                onDeleteTransaction={handleDeleteTransaction}
                 onRegisterSale={handleRegisterSale}
                 shopName={shopConfig.name}
                 shopPhone={shopConfig.phone}
                 shopCnpjCpf={shopConfig.cnpjCpf}
+                config={shopConfig}
+                shopLogo={shopConfig.logo}
+                customers={customers}
+                onAddCustomer={handleAddCustomer}
+                user={user}
               />
             )}
 
@@ -1288,6 +1411,10 @@ export default function App() {
                 onEditProduct={handleEditProduct}
                 onDeleteProduct={handleDeleteProduct}
                 onExportExcel={exportToExcel}
+                config={shopConfig}
+                onSaveConfig={handleSaveShopConfig}
+                shopName={shopConfig.name}
+                shopPhone={shopConfig.phone}
               />
             )}
 
@@ -1298,6 +1425,7 @@ export default function App() {
                 onEditOS={handleEditOS}
                 onDeleteOS={handleDeleteOS}
                 onReceivePayment={handleReceiveOSPayment}
+                onAddCustomer={handleAddCustomer}
                 shopName={shopConfig.name}
                 shopPhone={shopConfig.phone}
                 shopCnpjCpf={shopConfig.cnpjCpf}
@@ -1308,6 +1436,7 @@ export default function App() {
                 config={shopConfig}
                 user={user}
                 customers={customers}
+                staffList={staffList}
               />
             )}
 
@@ -1315,6 +1444,7 @@ export default function App() {
               <Customers
                 user={user}
                 customers={customers}
+                serviceOrders={serviceOrders}
                 onAddCustomer={handleAddCustomer}
                 onEditCustomer={handleEditCustomer}
                 onDeleteCustomer={handleDeleteCustomer}
@@ -1366,9 +1496,17 @@ export default function App() {
                 onSaveConfig={handleSaveShopConfig}
                 staffList={staffList}
                 onAddStaff={handleAddStaff}
+                onEditStaff={handleEditStaff}
                 onDeleteStaff={handleDeleteStaff}
                 transactions={transactions}
                 serviceOrders={serviceOrders}
+              />
+            )}
+
+            {currentTab === 'whatsapp' && (
+              <WhatsAppWeb 
+                config={shopConfig} 
+                onSaveConfig={handleSaveShopConfig} 
               />
             )}
           </motion.div>

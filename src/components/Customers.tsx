@@ -18,7 +18,7 @@ import {
   X,
   ArrowUpDown
 } from 'lucide-react';
-import { Customer } from '../types';
+import { Customer, ServiceOrder } from '../types';
 import importedClientsRaw from '../data/imported_clients.json';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -28,6 +28,7 @@ const IMPORTED_CLIENTS: any[] = importedClientsRaw;
 interface CustomersProps {
   user: any | null;
   customers: Customer[];
+  serviceOrders?: ServiceOrder[];
   onAddCustomer: (customer: Omit<Customer, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
   onEditCustomer: (id: string, updatedFields: Partial<Customer>) => Promise<void>;
   onDeleteCustomer: (id: string) => Promise<void>;
@@ -37,6 +38,7 @@ interface CustomersProps {
 export default function Customers({
   user,
   customers,
+  serviceOrders = [],
   onAddCustomer,
   onEditCustomer,
   onDeleteCustomer,
@@ -54,7 +56,7 @@ export default function Customers({
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [address, setAddress] = useState('');
-  const [cpf, setCpf] = useState('');
+  const [cpfCnpj, setCpfCnpj] = useState('');
   const [birthDate, setBirthDate] = useState('');
 
   // Is company account?
@@ -76,7 +78,7 @@ export default function Customers({
         name: c.name,
         phone: c.phone,
         address: c.address,
-        cpf: c.cpf,
+        cpfCnpj: c.cpf,
         email: '',
         birthDate: '',
         source: 'importado' as const
@@ -95,13 +97,26 @@ export default function Customers({
     const term = searchTerm.toLowerCase().trim();
     if (!term) return allClients;
 
-    return allClients.filter(c => 
-      c.name.toLowerCase().includes(term) ||
-      (c.phone && c.phone.replace(/\D/g, '').includes(term.replace(/\D/g, ''))) ||
-      (c.phone && c.phone.toLowerCase().includes(term)) ||
-      (c.cpf && c.cpf.replace(/\D/g, '').includes(term.replace(/\D/g, ''))) ||
-      (c.address && c.address.toLowerCase().includes(term))
-    );
+    return allClients.filter(c => {
+      try {
+        const nameMatch = c.name ? String(c.name).toLowerCase().includes(term) : false;
+        
+        const phoneClean = c.phone ? String(c.phone).replace(/\D/g, '') : '';
+        const termClean = term.replace(/\D/g, '');
+        const phoneMatch = phoneClean && termClean ? phoneClean.includes(termClean) : false;
+        const phoneStrMatch = c.phone ? String(c.phone).toLowerCase().includes(term) : false;
+        
+        const cpfClean = c.cpfCnpj ? String(c.cpfCnpj).replace(/\D/g, '') : '';
+        const cpfMatch = cpfClean && termClean ? cpfClean.includes(termClean) : false;
+        
+        const addressMatch = c.address ? String(c.address).toLowerCase().includes(term) : false;
+        
+        return nameMatch || phoneMatch || phoneStrMatch || cpfMatch || addressMatch;
+      } catch (err) {
+        console.error("Filter error on client:", c, err);
+        return false;
+      }
+    });
   }, [allClients, searchTerm]);
 
   // Sorting filter
@@ -145,7 +160,7 @@ export default function Customers({
     setPhone('');
     setEmail('');
     setAddress('');
-    setCpf('');
+    setCpfCnpj('');
     setBirthDate('');
     setIsModalOpen(true);
   };
@@ -156,7 +171,7 @@ export default function Customers({
     setPhone(client.phone || '');
     setEmail(client.email || '');
     setAddress(client.address || '');
-    setCpf(client.cpf || '');
+    setCpfCnpj(client.cpfCnpj || client.cpf || '');
     setBirthDate(client.birthDate || '');
     setIsModalOpen(true);
   };
@@ -173,7 +188,7 @@ export default function Customers({
           phone,
           email,
           address,
-          cpf,
+          cpfCnpj,
           birthDate
         });
       } else {
@@ -183,7 +198,7 @@ export default function Customers({
           phone,
           email,
           address,
-          cpf,
+          cpfCnpj,
           birthDate
         });
       }
@@ -371,6 +386,36 @@ export default function Customers({
                               Nasc: {new Date(client.birthDate + 'T00:00:00').toLocaleDateString('pt-BR')}
                             </p>
                           )}
+                          {(() => {
+                            const clientPhoneClean = client.phone ? String(client.phone).replace(/\D/g, '') : '';
+                            const clientNameLower = client.name.toLowerCase().trim();
+                            const clientOSs = serviceOrders.filter(os => {
+                              const osPhoneClean = os.customerPhone ? String(os.customerPhone).replace(/\D/g, '') : '';
+                              const osNameLower = os.customerName.toLowerCase().trim();
+                              if (clientPhoneClean && osPhoneClean) {
+                                return clientPhoneClean === osPhoneClean;
+                              }
+                              return clientNameLower === osNameLower;
+                            });
+
+                            if (clientOSs.length > 0) {
+                              return (
+                                <div className="mt-1 flex flex-wrap gap-1 items-center">
+                                  <span className="text-[9px] font-bold text-zinc-400 uppercase">OSs:</span>
+                                  {clientOSs.map(os => (
+                                    <span 
+                                      key={os.id} 
+                                      className="text-[9px] font-mono bg-zinc-100 hover:bg-zinc-200 border border-zinc-200 text-zinc-700 px-1 py-0.2 rounded font-bold transition-colors cursor-help" 
+                                      title={`${os.deviceName} - ${os.reportedDefect}`}
+                                    >
+                                      {os.osNumber}
+                                    </span>
+                                  ))}
+                                </div>
+                              );
+                            }
+                            return null;
+                          })()}
                         </div>
                       </div>
                     </td>
@@ -401,10 +446,10 @@ export default function Customers({
                       )}
                     </td>
                     <td className="px-5 py-4">
-                      {client.cpf ? (
+                      {client.cpfCnpj || client.cpf ? (
                         <p className="text-zinc-600 font-mono flex items-center gap-1">
                           <CreditCard size={10} className="text-zinc-400" />
-                          {client.cpf}
+                          {client.cpfCnpj || client.cpf}
                         </p>
                       ) : (
                         <span className="text-zinc-300 text-[10px]">Não informado</span>
@@ -566,8 +611,8 @@ export default function Customers({
                     <label className="block text-[11px] font-bold text-zinc-500 uppercase tracking-wider">CPF / CNPJ (Opcional)</label>
                     <input
                       type="text"
-                      value={cpf}
-                      onChange={(e) => setCpf(e.target.value)}
+                      value={cpfCnpj}
+                      onChange={(e) => setCpfCnpj(e.target.value)}
                       className="w-full px-3 py-2 border border-zinc-200 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-zinc-950"
                       placeholder="Ex: 111.222.333-44"
                     />

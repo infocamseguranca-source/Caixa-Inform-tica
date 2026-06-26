@@ -27,6 +27,8 @@ interface CashRegisterProps {
   categories?: string[];
   onExportExcel?: (data: any[], title: string) => void;
   onNavigateToCompras?: () => void;
+  config?: any;
+  staffList?: any[];
 }
 
 const DEFAULT_CATEGORIES = [
@@ -55,7 +57,9 @@ export default function CashRegister({
   onDeleteTransaction,
   categories = DEFAULT_CATEGORIES,
   onExportExcel,
-  onNavigateToCompras
+  onNavigateToCompras,
+  config,
+  staffList = []
 }: CashRegisterProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<'todos' | 'entrada' | 'saida'>('todos');
@@ -63,6 +67,9 @@ export default function CashRegister({
   const [filterPayment, setFilterPayment] = useState('todos');
   const [filterPeriod, setFilterPeriod] = useState<'hoje' | '7dias' | 'mes' | 'todos'>('todos');
   
+  const [filterMonth, setFilterMonth] = useState<string>('todos');
+  const [filterDay, setFilterDay] = useState<string>('todos');
+
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
@@ -164,6 +171,13 @@ export default function CashRegister({
     const tDate = new Date(t.date);
     const now = new Date();
     
+    if (filterMonth !== 'todos') {
+      matchesPeriod = matchesPeriod && tDate.getMonth().toString() === filterMonth;
+    }
+    if (filterDay !== 'todos') {
+      matchesPeriod = matchesPeriod && tDate.getDate().toString() === filterDay;
+    }
+
     if (filterPeriod === 'hoje') {
       matchesPeriod = tDate.toDateString() === now.toDateString();
     } else if (filterPeriod === '7dias') {
@@ -179,7 +193,7 @@ export default function CashRegister({
 
   // Inflow/Outflow calculations on filtered transactions
   const filteredInflow = filteredTransactions
-    .filter(t => t.type === 'entrada')
+    .filter(t => t.type === 'entrada' || t.type === 'abertura_caixa')
     .reduce((acc, curr) => acc + curr.amount, 0);
 
   const filteredOutflow = filteredTransactions
@@ -194,7 +208,7 @@ export default function CashRegister({
     const rows = filteredTransactions.map(t => [
       t.description,
       t.amount,
-      t.type === 'entrada' ? 'Entrada' : 'Saída',
+      t.type === 'entrada' ? 'Entrada' : t.type === 'saida' ? 'Saída' : t.type === 'abertura_caixa' ? 'Abertura de Caixa' : 'Fechamento de Caixa',
       t.category,
       t.paymentMethod.toUpperCase(),
       formatDate(t.date)
@@ -254,7 +268,7 @@ export default function CashRegister({
       </div>
 
       {/* Filter Stats bar */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-zinc-50 p-4 rounded-xl border border-zinc-200/60">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-zinc-50 p-4 rounded-xl border border-zinc-200/60">
         <div className="text-center md:text-left border-b md:border-b-0 md:border-r border-zinc-200 pb-3 md:pb-0 md:pr-4">
           <span className="text-[11px] uppercase tracking-wider font-bold text-zinc-400">Saldo Filtrado</span>
           <h4 className={`text-xl font-extrabold ${filteredBalance >= 0 ? 'text-zinc-950' : 'text-rose-600'} mt-1`}>
@@ -267,16 +281,70 @@ export default function CashRegister({
             + {formatCurrency(filteredInflow)}
           </h4>
         </div>
-        <div className="text-center md:text-left md:pl-4">
+        <div className="text-center md:text-left md:border-r border-zinc-200 pb-3 md:pb-0 md:px-4">
           <span className="text-[11px] uppercase tracking-wider font-bold text-zinc-400">Saídas Filtradas</span>
           <h4 className="text-xl font-extrabold text-rose-600 mt-1">
             - {formatCurrency(filteredOutflow)}
           </h4>
         </div>
+        <div className="md:pl-4 overflow-y-auto max-h-24">
+          <span className="text-[10px] uppercase tracking-wider font-bold text-zinc-400 mb-1.5 block">Dias Abertos (Mês Atual)</span>
+          <div className="flex flex-wrap gap-1.5">
+            {Array.from({ length: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate() }).map((_, i) => {
+              const day = i + 1;
+              const dateStr = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+              const hasMovement = transactions.some(t => t.date.startsWith(dateStr));
+              if (!hasMovement) return null;
+              return (
+                <div key={day} className="flex items-center gap-1 bg-white border border-zinc-200 px-1.5 py-0.5 rounded-md shadow-xs">
+                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>
+                  <span className="text-[9px] font-bold text-zinc-600">{day}/{String(new Date().getMonth() + 1).padStart(2, '0')}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
 
       {/* Filter and Search controls */}
-      <div className="bg-white p-5 rounded-2xl border border-zinc-100 space-y-4">
+      <div className="bg-white p-5 rounded-2xl border border-zinc-100 space-y-4 overflow-hidden">
+        
+        {/* Month and Day round selectors */}
+        <div className="flex flex-col gap-3 pb-3 border-b border-zinc-100">
+          <div className="flex items-center gap-2 overflow-x-auto pb-1">
+            <span className="text-[10px] uppercase tracking-wider font-bold text-zinc-400 mr-1 min-w-[30px]">Mês:</span>
+            {Array.from({length: 12}, (_, i) => {
+              const m = i.toString();
+              const label = new Date(2020, i, 1).toLocaleString('pt-BR', { month: 'short' }).substring(0, 3).toUpperCase();
+              return (
+                <button
+                  key={m}
+                  onClick={() => setFilterMonth(filterMonth === m ? 'todos' : m)}
+                  className={`flex-shrink-0 w-9 h-9 rounded-full text-[10px] font-bold transition-all ${filterMonth === m ? 'bg-zinc-900 text-white shadow-md scale-105' : 'bg-zinc-100 text-zinc-500 hover:bg-zinc-200'}`}
+                >
+                  {label}
+                </button>
+              )
+            })}
+          </div>
+          
+          <div className="flex items-center gap-2 overflow-x-auto pb-1">
+            <span className="text-[10px] uppercase tracking-wider font-bold text-zinc-400 mr-1 min-w-[30px]">Dia:</span>
+            {Array.from({length: 31}, (_, i) => {
+              const d = (i + 1).toString();
+              return (
+                <button
+                  key={d}
+                  onClick={() => setFilterDay(filterDay === d ? 'todos' : d)}
+                  className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${filterDay === d ? 'bg-zinc-900 text-white shadow-md scale-105' : 'bg-zinc-100 text-zinc-500 hover:bg-zinc-200'}`}
+                >
+                  {d}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
           {/* Search Input */}
           <div className="relative">
@@ -377,14 +445,25 @@ export default function CashRegister({
                   <tr key={t.id} className="hover:bg-zinc-50/40 transition-colors">
                     {/* Title & Desc */}
                     <td className="py-4 px-6 flex items-center gap-3">
-                      <div className={`p-2 rounded-lg shrink-0 ${t.type === 'entrada' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
-                        {t.type === 'entrada' ? <ArrowUpRight size={18} /> : <ArrowDownRight size={18} />}
+                      <div className={`p-2 rounded-lg shrink-0 ${
+                        t.type === 'entrada' || t.type === 'abertura_caixa' 
+                          ? 'bg-emerald-50 text-emerald-600' 
+                          : t.type === 'fechamento_caixa' 
+                            ? 'bg-amber-50 text-amber-600'
+                            : 'bg-rose-50 text-rose-600'
+                      }`}>
+                        {(t.type === 'entrada' || t.type === 'abertura_caixa') ? <ArrowUpRight size={18} /> : <ArrowDownRight size={18} />}
                       </div>
                       <div className="min-w-0">
                         <p className="text-sm font-semibold text-zinc-900 truncate max-w-xs">{t.description}</p>
                         {t.osId && (
                           <span className="inline-block bg-blue-50 text-blue-600 text-[10px] font-bold px-1.5 py-0.5 rounded mt-0.5">
                             Integrado à OS
+                          </span>
+                        )}
+                        {(t.type === 'abertura_caixa' || t.type === 'fechamento_caixa') && (
+                          <span className="inline-block bg-zinc-100 text-zinc-600 text-[10px] font-bold px-1.5 py-0.5 rounded mt-0.5">
+                            Sessão do Caixa
                           </span>
                         )}
                       </div>
@@ -407,8 +486,11 @@ export default function CashRegister({
 
                     {/* Amount */}
                     <td className="py-4 px-4 text-right">
-                      <span className={`text-sm font-bold ${t.type === 'entrada' ? 'text-emerald-600' : 'text-rose-600'}`}>
-                        {t.type === 'entrada' ? '+' : '-'} {formatCurrency(t.amount)}
+                      <span className={`text-sm font-bold ${
+                        (t.type === 'entrada' || t.type === 'abertura_caixa') ? 'text-emerald-600' 
+                        : t.type === 'fechamento_caixa' ? 'text-amber-600' : 'text-rose-600'
+                      }`}>
+                        {(t.type === 'entrada' || t.type === 'abertura_caixa') ? '+' : t.type === 'fechamento_caixa' ? '=' : '-'} {formatCurrency(t.amount)}
                       </span>
                     </td>
 

@@ -13,9 +13,10 @@ import {
   Sparkles,
   CheckCircle,
   BellRing,
-  X
+  X,
+  MessageCircle
 } from 'lucide-react';
-import { Appointment, Staff, Customer } from '../types';
+import { Appointment, Staff, Customer, ShopConfig } from '../types';
 import { formatDate } from '../utils';
 import { motion, AnimatePresence } from 'motion/react';
 import CustomerAutocomplete from './CustomerAutocomplete';
@@ -27,6 +28,7 @@ interface AppointmentsProps {
   onDeleteAppointment: (id: string) => Promise<void>;
   user: any | null;
   customers: Customer[];
+  config?: ShopConfig;
 }
 
 export default function Appointments({
@@ -35,7 +37,8 @@ export default function Appointments({
   onAddAppointment,
   onDeleteAppointment,
   user,
-  customers
+  customers,
+  config
 }: AppointmentsProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [customerName, setCustomerName] = useState('');
@@ -147,6 +150,69 @@ export default function Appointments({
     }
   };
 
+  const handleSendWhatsApp = (app: Appointment) => {
+    if (!app.customerPhone) {
+      alert('Este agendamento não possui um telefone de cliente cadastrado.');
+      return;
+    }
+
+    const cleanPhone = app.customerPhone.replace(/\D/g, '');
+    let formattedPhone = cleanPhone;
+    
+    if (cleanPhone.length === 10 || cleanPhone.length === 11) {
+      formattedPhone = '55' + cleanPhone;
+    }
+
+    const techName = staffList.find(s => s.id === app.technicianId)?.name || 'nossa equipe';
+
+    const defaultMsg = `Olá, {nome}. Aqui é da Assistência Técnica.\n\nEste é um lembrete do seu agendamento para o serviço de *{servico}*.\n\n📅 *Data/Hora:* {data}\n⚙️ *Técnico:* {tecnico}\n\nObrigado por escolher nossa assistência!`;
+    const messageTemplate = config?.whatsappMessages?.appointment || defaultMsg;
+
+    const message = messageTemplate
+      .replace(/\{nome\}/g, app.customerName)
+      .replace(/\{servico\}/g, app.service)
+      .replace(/\{data\}/g, new Date(app.date).toLocaleString('pt-BR'))
+      .replace(/\{tecnico\}/g, techName);
+
+    const encodedMessage = encodeURIComponent(message);
+    const whatsappUrl = `https://wa.me/${formattedPhone}?text=${encodedMessage}`;
+
+    if (config?.whatsappApiToken && config?.whatsappPhoneNumberId) {
+      try {
+        fetch(`https://graph.facebook.com/v17.0/${config.whatsappPhoneNumberId}/messages`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${config.whatsappApiToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            messaging_product: "whatsapp",
+            to: formattedPhone,
+            type: "text",
+            text: { body: message }
+          })
+        }).then(async (response) => {
+          if (!response.ok) {
+            const errData = await response.json();
+            console.error('WhatsApp API Error:', errData);
+            alert('Erro na API do WhatsApp (verifique a regra de 24h ou credenciais). Abrindo o WhatsApp Web como fallback...');
+            window.open(whatsappUrl, '_blank');
+          } else {
+            alert('Mensagem enviada com sucesso pela API do WhatsApp Business!');
+          }
+        }).catch((err) => {
+          console.error('Fetch error:', err);
+          window.open(whatsappUrl, '_blank');
+        });
+        return;
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    window.open(whatsappUrl, '_blank');
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -211,6 +277,13 @@ export default function Appointments({
                           {new Date(app.date).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
                         </div>
 
+                        <button
+                          onClick={() => handleSendWhatsApp(app)}
+                          className="p-1 hover:bg-green-50 text-zinc-400 hover:text-green-600 rounded transition-colors mt-2 cursor-pointer"
+                          title="Enviar WhatsApp"
+                        >
+                          <MessageCircle size={14} />
+                        </button>
                         <button
                           onClick={() => handleDelete(app.id)}
                           className="p-1 hover:bg-rose-50 text-zinc-400 hover:text-rose-600 rounded transition-colors mt-2 cursor-pointer"
