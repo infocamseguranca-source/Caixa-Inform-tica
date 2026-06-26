@@ -31,7 +31,7 @@ interface SettingsBackupProps {
   serviceOrders: ServiceOrder[];
   backupHistory: BackupHistory[];
   onAddBackupLog: (log: Omit<BackupHistory, 'id'>) => Promise<void>;
-  onRestoreData: (backupData: { transactions: Transaction[]; serviceOrders: ServiceOrder[] }) => Promise<void>;
+  onRestoreData: (backupData: any) => Promise<void>;
 }
 
 export default function SettingsBackup({
@@ -51,6 +51,10 @@ export default function SettingsBackup({
   const [restoring, setRestoring] = useState(false);
   const [backupMessage, setBackupMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [driveFiles, setDriveFiles] = useState<{ id: string; name: string; createdTime: string; size?: string }[]>([]);
+  const [loadingDriveFiles, setLoadingDriveFiles] = useState(false);
+  const [driveError, setDriveError] = useState<string | null>(null);
 
   const [isElectron, setIsElectron] = useState(false);
   const [electronBackupPath, setElectronBackupPath] = useState<string | null>(null);
@@ -93,6 +97,91 @@ export default function SettingsBackup({
       };
     }
   }, [transactions.length, serviceOrders.length]);
+
+  const fetchDriveFiles = async () => {
+    if (!token) return;
+    setLoadingDriveFiles(true);
+    setDriveError(null);
+    try {
+      const qStr = "name contains 'ControleCaixa' and mimeType = 'application/json' and trashed = false";
+      const url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(qStr)}&orderBy=createdTime%20desc&fields=files(id,%20name,%20createdTime,%20size)&pageSize=10`;
+      
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Erro Google Drive: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      setDriveFiles(data.files || []);
+    } catch (err: any) {
+      console.error(err);
+      setDriveError(err.message || 'Falha ao buscar backups no Google Drive.');
+    } finally {
+      setLoadingDriveFiles(false);
+    }
+  };
+
+  useEffect(() => {
+    if (token) {
+      fetchDriveFiles();
+    } else {
+      setDriveFiles([]);
+    }
+  }, [token]);
+
+  const handleRestoreFromDrive = async (fileId: string, fileName: string, fileDate: string) => {
+    if (!token) return;
+    
+    const confirmRestore = window.confirm(
+      `Atenção: Você está prestes a restaurar o backup "${fileName}" do Google Drive (gerado em ${formatDate(fileDate)}).\n` +
+      `Isso substituirá todos os seus dados atuais (${transactions.length} lançamentos e ${serviceOrders.length} O.S.).\n` +
+      `Deseja prosseguir com a restauração?`
+    );
+
+    if (!confirmRestore) return;
+
+    setRestoring(true);
+    setBackupMessage(null);
+
+    try {
+      const response = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Erro ao baixar arquivo do Drive: ${response.statusText}`);
+      }
+
+      const parsedData = await response.json();
+
+      if (!parsedData.transactions || !parsedData.serviceOrders) {
+        throw new Error('Arquivo de backup inválido. Chaves "transactions" ou "serviceOrders" não encontradas.');
+      }
+
+      await onRestoreData(parsedData);
+
+      setBackupMessage({ 
+        type: 'success', 
+        text: `Backup "${fileName}" restaurado do Google Drive com sucesso! Todos os dados foram atualizados.` 
+      });
+
+    } catch (err: any) {
+      console.error(err);
+      setBackupMessage({ 
+        type: 'error', 
+        text: `Falha ao restaurar do Drive: ${err.message || 'Formato inválido'}` 
+      });
+    } finally {
+      setRestoring(false);
+    }
+  };
 
   const triggerElectronBackup = () => {
     const hasElectron = typeof window !== 'undefined' && (window as any).electronAPI !== undefined;
@@ -473,6 +562,57 @@ export default function SettingsBackup({
               {restoring ? 'Carregando backup...' : 'Selecionar Arquivo de Backup (.json)'}
             </button>
           </div>
+
+          {token && (
+            <div className="border-t border-zinc-100 pt-4 mt-4 space-y-3">
+              <div className="flex justify-between items-center">
+                <h4 className="text-xs font-bold text-zinc-700 uppercase tracking-wider flex items-center gap-1.5">
+                  <Cloud size={12} /> Backups no Google Drive
+                </h4>
+                <button 
+                  onClick={fetchDriveFiles} 
+                  disabled={loadingDriveFiles}
+                  className="text-[10px] font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                  type="button"
+                >
+                  <RefreshCw size={10} className={loadingDriveFiles ? 'animate-spin' : ''} />
+                  Atualizar
+                </button>
+              </div>
+
+              {loadingDriveFiles ? (
+                <div className="py-4 text-center text-xs text-zinc-400 flex items-center justify-center gap-2">
+                  <RefreshCw size={12} className="animate-spin text-zinc-400" />
+                  Buscando arquivos no Drive...
+                </div>
+              ) : driveError ? (
+                <p className="text-[10px] text-rose-500">{driveError}</p>
+              ) : driveFiles.length === 0 ? (
+                <p className="text-[10px] text-zinc-400 text-center py-2">Nenhum arquivo de backup encontrado no seu Drive.</p>
+              ) : (
+                <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                  {driveFiles.map((file) => (
+                    <div key={file.id} className="p-2 border border-zinc-100 rounded-lg flex justify-between items-center bg-zinc-50/50 hover:bg-zinc-50 transition-colors text-xs">
+                      <div className="min-w-0 flex-1 pr-2">
+                        <p className="font-semibold text-zinc-800 truncate" title={file.name}>{file.name}</p>
+                        <p className="text-[10px] text-zinc-400 mt-0.5">
+                          {formatDate(file.createdTime)} {file.size ? ` • ${Math.round(parseInt(file.size) / 1024)} KB` : ''}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => handleRestoreFromDrive(file.id, file.name, file.createdTime)}
+                        disabled={restoring}
+                        className="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-lg text-[10px] font-bold cursor-pointer transition-colors shrink-0 disabled:opacity-50"
+                        type="button"
+                      >
+                        Restaurar
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
       </div>

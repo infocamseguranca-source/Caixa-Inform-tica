@@ -6,9 +6,9 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // Helper to check ownership for standard collections
+    // Helper to check ownership for standard collections (allowing legacy documents without ownerId)
     function isOwner(resourceData) {
-      return resourceData.ownerId == request.auth.uid;
+      return resourceData.get('ownerId', null) == null || resourceData.get('ownerId', null) == request.auth.uid;
     }
 
     match /transactions/{transactionId} {

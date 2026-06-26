@@ -797,6 +797,22 @@ export default function App() {
       updatedAt: new Date().toISOString()
     };
     const docRef = await addDoc(collection(db, 'service_orders'), cleanPayload({ ...osPayload, ownerId: user.uid }));
+
+    // Auto-create transaction in Cashier (Caixa/PDV) if paid
+    if (osPayload.paymentStatus === 'pago') {
+      const transactionPayload = {
+        description: `Recebimento O.S. ${osNumber} - Cliente: ${osPayload.customerName}`,
+        amount: osPayload.priceLabor + osPayload.priceParts,
+        type: 'entrada',
+        category: 'Serviço de Assistência',
+        paymentMethod: (osPayload as any).paymentMethod || 'pix',
+        date: new Date().toISOString(),
+        osId: docRef.id,
+        ownerId: user.uid
+      };
+      await addDoc(collection(db, 'transactions'), cleanPayload(transactionPayload));
+    }
+
     return { id: docRef.id, ...osPayload };
   };
 
@@ -805,11 +821,37 @@ export default function App() {
       return { id } as any;
     }
     const now = new Date().toISOString();
+    const existing = serviceOrders.find(o => o.id === id);
+
+    // Auto-create transaction in Cashier (Caixa/PDV) if transitioned to paid
+    const isTransitioningToPaid = existing && existing.paymentStatus !== 'pago' && updatedFields.paymentStatus === 'pago';
+
     await updateDoc(doc(db, 'service_orders', id), cleanPayload({
       ...updatedFields,
       updatedAt: now
     }));
-    const existing = serviceOrders.find(o => o.id === id);
+
+    if (isTransitioningToPaid) {
+      const labor = updatedFields.priceLabor !== undefined ? updatedFields.priceLabor : (existing?.priceLabor || 0);
+      const parts = updatedFields.priceParts !== undefined ? updatedFields.priceParts : (existing?.priceParts || 0);
+      const total = labor + parts;
+      const method = updatedFields.paymentMethod || existing?.paymentMethod || 'pix';
+      const customerName = updatedFields.customerName || existing?.customerName || '';
+      const osNumber = existing?.osNumber || '';
+
+      const transactionPayload = {
+        description: `Recebimento O.S. ${osNumber} - Cliente: ${customerName}`,
+        amount: total,
+        type: 'entrada',
+        category: 'Serviço de Assistência',
+        paymentMethod: method,
+        date: new Date().toISOString(),
+        osId: id,
+        ownerId: user.uid
+      };
+      await addDoc(collection(db, 'transactions'), cleanPayload(transactionPayload));
+    }
+
     return { ...existing, ...updatedFields, id, updatedAt: now } as ServiceOrder;
   };
 
@@ -922,6 +964,7 @@ export default function App() {
       await updateDoc(doc(db, 'service_orders', os.id), cleanPayload({
         status: 'entregue',
         paymentStatus: 'pago',
+        paymentMethod,
         updatedAt: new Date().toISOString()
       }));
       alert(`Pagamento de ${os.osNumber} recebido com sucesso no Caixa!`);

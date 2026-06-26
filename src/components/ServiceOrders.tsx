@@ -149,7 +149,7 @@ export default function ServiceOrders({
 
       if (finalizeMarkAsPaid && finalizingOS.paymentStatus !== 'pago') {
         updatedFields.paymentStatus = 'pago';
-        await onReceivePayment(finalizingOS, finalizePaymentMethod);
+        updatedFields.paymentMethod = finalizePaymentMethod;
       }
 
       const updatedOS = await onEditOS(finalizingOS.id, updatedFields);
@@ -200,6 +200,7 @@ export default function ServiceOrders({
   const [priceLaborStr, setPriceLaborStr] = useState('0');
   const [pricePartsStr, setPricePartsStr] = useState('0');
   const [paymentStatus, setPaymentStatus] = useState<'pendente' | 'pago'>('pendente');
+  const [formPaymentMethod, setFormPaymentMethod] = useState<'dinheiro' | 'pix' | 'debito' | 'credito'>('pix');
   const [technicianId, setTechnicianId] = useState<string>('');
 
   // New Fields: Pattern Lock sequence
@@ -801,6 +802,7 @@ export default function ServiceOrders({
     setPriceLaborStr('0');
     setPricePartsStr('0');
     setPaymentStatus('pendente');
+    setFormPaymentMethod('pix');
     setTechnicianId('');
     setPatternLock('');
     setPasswordType('padrao');
@@ -833,6 +835,7 @@ export default function ServiceOrders({
     setPriceLaborStr(os.priceLabor.toString());
     setPricePartsStr(os.priceParts.toString());
     setPaymentStatus(os.paymentStatus);
+    setFormPaymentMethod(os.paymentMethod || 'pix');
     setTechnicianId(os.technicianId || '');
     setPatternLock(os.patternLock || '');
     setPasswordType(os.passwordType || 'padrao');
@@ -913,6 +916,7 @@ export default function ServiceOrders({
           priceParts,
           totalAmount: priceLabor + priceParts,
           paymentStatus,
+          paymentMethod: formPaymentMethod,
           patternLock,
           passwordType,
           passwordValue,
@@ -940,6 +944,7 @@ export default function ServiceOrders({
           priceParts,
           totalAmount: priceLabor + priceParts,
           paymentStatus,
+          paymentMethod: formPaymentMethod,
           patternLock,
           passwordType,
           passwordValue,
@@ -1802,19 +1807,37 @@ export default function ServiceOrders({
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-                    <div>
-                      <label className="block text-xs font-bold text-zinc-500 mb-1">Faturamento da O.S.</label>
-                      <select
-                        value={paymentStatus}
-                        onChange={(e) => setPaymentStatus(e.target.value as any)}
-                        className="w-full px-3 py-2 border border-zinc-200 rounded-xl text-xs bg-white text-zinc-800"
-                      >
-                        <option value="pendente">Pendente de Pagamento</option>
-                        <option value="pago">Pago / Recebido</option>
-                      </select>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-xs font-bold text-zinc-500 mb-1">Faturamento da O.S.</label>
+                        <select
+                          value={paymentStatus}
+                          onChange={(e) => setPaymentStatus(e.target.value as any)}
+                          className="w-full px-3 py-2 border border-zinc-200 rounded-xl text-xs bg-white text-zinc-800"
+                        >
+                          <option value="pendente">Pendente de Pagamento</option>
+                          <option value="pago">Pago / Recebido</option>
+                        </select>
+                      </div>
+
+                      {paymentStatus === 'pago' && (
+                        <div>
+                          <label className="block text-xs font-bold text-zinc-500 mb-1">Forma de Pagamento</label>
+                          <select
+                            value={formPaymentMethod}
+                            onChange={(e) => setFormPaymentMethod(e.target.value as any)}
+                            className="w-full px-3 py-2 border border-zinc-200 rounded-xl text-xs bg-white text-zinc-800"
+                          >
+                            <option value="pix">PIX</option>
+                            <option value="dinheiro">Dinheiro</option>
+                            <option value="debito">Cartão de Débito</option>
+                            <option value="credito">Cartão de Crédito</option>
+                          </select>
+                        </div>
+                      )}
                     </div>
 
-                    <div className="bg-zinc-50 p-4 rounded-xl flex items-center justify-between border border-zinc-100">
+                    <div className="bg-zinc-50 p-4 rounded-xl flex items-center justify-between border border-zinc-100 self-start">
                       <div>
                         <span className="text-xs font-bold text-zinc-400">Total O.S.</span>
                         <p className="text-lg font-extrabold text-zinc-950 mt-0.5">

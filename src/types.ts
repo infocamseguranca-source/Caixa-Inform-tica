@@ -49,6 +49,7 @@ export interface ServiceOrder {
   priceParts: number;
   totalAmount: number;
   paymentStatus: 'pendente' | 'pago';
+  paymentMethod?: 'dinheiro' | 'pix' | 'debito' | 'credito';
   patternLock?: string; // Legacy: String representation of grid pattern dots, e.g., "1-2-3"
   passwordType?: 'pin' | 'padrao' | 'escrita';
   passwordValue?: string;

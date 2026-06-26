@@ -3,6 +3,7 @@
   "appId": "1:140733175665:web:b232518a23f9a86243c8d0",
   "apiKey": "AIzaSyBdKKHzNyooGy52mIqQxcQ-JvMcd_fPdbE",
   "authDomain": "starry-torus-3wjkk.firebaseapp.com",
+  "firestoreDatabaseId": "ai-studio-controledecaixa-0e475161-1a25-47f5-9951-9c93649e7cf4",
   "storageBucket": "starry-torus-3wjkk.firebasestorage.app",
   "messagingSenderId": "140733175665",
   "measurementId": ""
