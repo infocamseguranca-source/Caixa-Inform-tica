@@ -190,3 +190,26 @@ export interface CashRegisterState {
   entradas: number;
   saidas: number;
 }
+
+export interface CustomerPartOrder {
+  id: string;
+  orderNumber: string;
+  customerName: string;
+  customerPhone: string;
+  customerCpf?: string;
+  customerAddress?: string;
+  partName: string;
+  clientPrice: number;
+  daysToArrive: number;
+  paymentType: 'pago_antecipado' | 'sinal' | 'confianca';
+  depositAmount?: number;
+  costPrice: number;
+  supplierLink?: string;
+  isTrustedClient: boolean;
+  status: 'pendente' | 'recebido' | 'finalizado';
+  deliveryType?: 'retirar' | 'entregar';
+  paymentMethod?: 'dinheiro' | 'pix' | 'debito' | 'credito';
+  createdAt: string;
+  updatedAt: string;
+  ownerId?: string;
+}

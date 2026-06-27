@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   LayoutDashboard, 
   DollarSign, 
@@ -18,7 +18,8 @@ import {
   Download,
   FileSpreadsheet,
   Lock,
-  MessageCircle
+  MessageCircle,
+  ClipboardList
 } from 'lucide-react';
 import { 
   collection, 
@@ -35,7 +36,7 @@ import {
 } from 'firebase/firestore';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { db, auth, googleSignIn, logout, getAccessToken } from './firebase';
-import { Transaction, ServiceOrder, BackupHistory, Product, Staff, Appointment, ShopConfig, EquipmentPurchase, Customer } from './types';
+import { Transaction, ServiceOrder, BackupHistory, Product, Staff, Appointment, ShopConfig, EquipmentPurchase, Customer, CustomerPartOrder } from './types';
 import { generateOSNumber, exportToExcel } from './utils';
 import { motion, AnimatePresence } from 'motion/react';
 import seedData from './seed.json';
@@ -52,6 +53,7 @@ import SettingsShop from './components/SettingsShop';
 import WhatsAppWeb from './components/WhatsAppWeb';
 import EquipmentPurchases from './components/EquipmentPurchases';
 import Customers from './components/Customers';
+import PartOrders from './components/PartOrders';
 
 const SAMPLE_TRANSACTIONS = [
   {
@@ -186,7 +188,7 @@ const DEFAULT_CONFIG: ShopConfig = {
     'Outros'
   ],
   osStartNumber: 1001,
-  menuOrder: ['dashboard', 'caixa', 'vendas', 'produtos', 'os', 'clientes', 'compras', 'agendamentos', 'backup', 'settings_shop'],
+  menuOrder: ['dashboard', 'caixa', 'vendas', 'produtos', 'os', 'clientes', 'compras', 'agendamentos', 'backup', 'encomendas', 'settings_shop'],
   autoSaveOSToDrive: false,
   finalizationOptions: ['Pronto para Retirada', 'Retirado Sem Reparo', 'Devolvido ao Cliente', 'Entregue para outra Assistência', 'Sem Conserto / Descarte'],
   purchaseCategories: ['Informatica', 'Celulares'],
@@ -226,6 +228,7 @@ export default function App() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [equipmentPurchases, setEquipmentPurchases] = useState<EquipmentPurchase[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [partsOrders, setPartsOrders] = useState<CustomerPartOrder[]>([]);
   const [shopConfig, setShopConfig] = useState<ShopConfig>(DEFAULT_CONFIG);
   
   const [loading, setLoading] = useState(true);
@@ -372,6 +375,13 @@ export default function App() {
         setCustomers([]);
       }
 
+      const localPartsOrders = localStorage.getItem('infocam_parts_orders');
+      if (localPartsOrders) {
+        setPartsOrders(JSON.parse(localPartsOrders));
+      } else {
+        setPartsOrders([]);
+      }
+
       if (localConfig) {
         setShopConfig(JSON.parse(localConfig));
       } else {
@@ -489,6 +499,21 @@ export default function App() {
       }
     );
 
+    // Subscribe to parts orders collection
+    const unsubPartsOrders = onSnapshot(
+      query(collection(db, 'parts_orders'), where('ownerId', '==', user.uid)), 
+      (snapshot) => {
+        const data: CustomerPartOrder[] = [];
+        snapshot.forEach((doc) => {
+          data.push({ id: doc.id, ...doc.data() } as CustomerPartOrder);
+        });
+        setPartsOrders(data);
+      },
+      (error) => {
+        handleFirestoreError(error, 'get', 'parts_orders');
+      }
+    );
+
     return () => {
       unsubTransactions();
       unsubOS();
@@ -499,6 +524,7 @@ export default function App() {
       unsubCustomers();
       unsubConfig();
       unsubPurchases();
+      unsubPartsOrders();
     };
   }, [user]);
 
@@ -570,6 +596,16 @@ export default function App() {
     if (loading) return;
     localStorage.setItem('infocam_config', JSON.stringify(shopConfig));
   }, [shopConfig, loading]);
+
+  useEffect(() => {
+    if (loading) return;
+    localStorage.setItem('infocam_parts_orders', JSON.stringify(partsOrders));
+  }, [partsOrders, loading]);
+
+  useEffect(() => {
+    if (loading) return;
+    localStorage.setItem('infocam_customers', JSON.stringify(customers));
+  }, [customers, loading]);
 
   // Seeding sample template data
   const handleSeedSamples = async () => {
@@ -719,17 +755,33 @@ export default function App() {
 
   // CRUD Transaction Operations
   const handleAddTransaction = async (item: Omit<Transaction, 'id'>) => {
-    if (!checkAuth('Para realizar novos lançamentos no fluxo de caixa real, conecte sua conta do Google.')) return;
+    if (!user) {
+      setAuthModalMessage('Para realizar novos lançamentos no fluxo de caixa real, conecte sua conta do Google.');
+      setShowAuthModal(true);
+      const newTx = { ...item, id: `local-${Date.now()}` } as Transaction;
+      setTransactions(prev => [...prev, newTx]);
+      return;
+    }
     await addDoc(collection(db, 'transactions'), cleanPayload({ ...item, ownerId: user.uid }));
   };
 
   const handleEditTransaction = async (id: string, updatedFields: Partial<Transaction>) => {
-    if (!checkAuth('Para editar lançamentos no fluxo de caixa real, conecte sua conta do Google.')) return;
+    if (!user) {
+      setAuthModalMessage('Para editar lançamentos no fluxo de caixa real, conecte sua conta do Google.');
+      setShowAuthModal(true);
+      setTransactions(prev => prev.map(t => t.id === id ? { ...t, ...updatedFields } : t));
+      return;
+    }
     await updateDoc(doc(db, 'transactions', id), cleanPayload(updatedFields));
   };
 
   const handleDeleteTransaction = async (id: string) => {
-    if (!checkAuth('Para excluir lançamentos no fluxo de caixa real, conecte sua conta do Google.')) return;
+    if (!user) {
+      setAuthModalMessage('Para excluir lançamentos no fluxo de caixa real, conecte sua conta do Google.');
+      setShowAuthModal(true);
+      setTransactions(prev => prev.filter(t => t.id !== id));
+      return;
+    }
     await deleteDoc(doc(db, 'transactions', id));
   };
 
@@ -771,12 +823,6 @@ export default function App() {
 
   // CRUD OS Operations
   const handleAddOS = async (item: Omit<ServiceOrder, 'id' | 'osNumber' | 'createdAt' | 'updatedAt'>): Promise<ServiceOrder> => {
-    if (!user) {
-      setAuthModalMessage('Para abrir ordens de serviço reais, conecte sua conta do Google.');
-      setShowAuthModal(true);
-      return { id: `fake-${Date.now()}`, osNumber: 'OS-TEMP', createdAt: '', updatedAt: '', status: 'aguardando', totalAmount: 0, paymentStatus: 'pendente', ...item } as any;
-    }
-    
     // Find the max OS number from existing ones to ensure sequential numbering
     let maxOSNum = 0;
     serviceOrders.forEach(os => {
@@ -786,16 +832,50 @@ export default function App() {
         if (num > maxOSNum) maxOSNum = num;
       }
     });
-    // If no existing numbered OS found, default to length. If there is, increment max.
-    const baseCount = maxOSNum > 0 ? maxOSNum : serviceOrders.length;
-    
-    const osNumber = generateOSNumber(baseCount);
+
+    // Get starting number from shopConfig (defaults to 1001 if not set)
+    const startNum = typeof shopConfig?.osStartNumber === 'number'
+      ? shopConfig.osStartNumber
+      : parseInt(shopConfig?.osStartNumber as any, 10) || 1001;
+
+    // Use the max existing OS number or the configured start number
+    let nextNum = startNum;
+    if (maxOSNum >= startNum) {
+      nextNum = maxOSNum + 1;
+    }
+
+    const osNumber = `OS-${nextNum.toString().padStart(4, '0')}`;
     const osPayload = {
       ...item,
       osNumber,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
+
+    if (!user) {
+      setAuthModalMessage('Para abrir ordens de serviço reais, conecte sua conta do Google.');
+      setShowAuthModal(true);
+      const fakeOS = { id: `local-${Date.now()}`, ...osPayload } as ServiceOrder;
+      setServiceOrders(prev => [...prev, fakeOS]);
+
+      // Auto-create transaction in Cashier (Caixa/PDV) if paid (local state)
+      if (osPayload.paymentStatus === 'pago') {
+        const transactionPayload = {
+          id: `local-tx-${Date.now()}`,
+          description: `Recebimento O.S. ${osNumber} - Cliente: ${osPayload.customerName}`,
+          amount: osPayload.priceLabor + osPayload.priceParts,
+          type: 'entrada',
+          category: 'Serviço de Assistência',
+          paymentMethod: (osPayload as any).paymentMethod || 'pix',
+          date: new Date().toISOString(),
+          osId: fakeOS.id
+        };
+        setTransactions(prev => [...prev, transactionPayload]);
+      }
+
+      return fakeOS;
+    }
+
     const docRef = await addDoc(collection(db, 'service_orders'), cleanPayload({ ...osPayload, ownerId: user.uid }));
 
     // Auto-create transaction in Cashier (Caixa/PDV) if paid
@@ -817,11 +897,41 @@ export default function App() {
   };
 
   const handleEditOS = async (id: string, updatedFields: Partial<ServiceOrder>): Promise<ServiceOrder> => {
-    if (!checkAuth('Para salvar alterações em ordens de serviço reais, conecte sua conta do Google.')) {
-      return { id } as any;
-    }
     const now = new Date().toISOString();
     const existing = serviceOrders.find(o => o.id === id);
+
+    if (!user) {
+      setAuthModalMessage('Para salvar alterações em ordens de serviço reais, conecte sua conta do Google.');
+      setShowAuthModal(true);
+      
+      const isTransitioningToPaid = existing && existing.paymentStatus !== 'pago' && updatedFields.paymentStatus === 'pago';
+      const updatedOS = { ...existing, ...updatedFields, id, updatedAt: now } as ServiceOrder;
+      
+      setServiceOrders(prev => prev.map(o => o.id === id ? updatedOS : o));
+
+      if (isTransitioningToPaid) {
+        const labor = updatedFields.priceLabor !== undefined ? updatedFields.priceLabor : (existing?.priceLabor || 0);
+        const parts = updatedFields.priceParts !== undefined ? updatedFields.priceParts : (existing?.priceParts || 0);
+        const total = labor + parts;
+        const method = updatedFields.paymentMethod || existing?.paymentMethod || 'pix';
+        const customerName = updatedFields.customerName || existing?.customerName || '';
+        const osNumber = existing?.osNumber || '';
+
+        const transactionPayload = {
+          id: `local-tx-${Date.now()}`,
+          description: `Recebimento O.S. ${osNumber} - Cliente: ${customerName}`,
+          amount: total,
+          type: 'entrada',
+          category: 'Serviço de Assistência',
+          paymentMethod: method,
+          date: new Date().toISOString(),
+          osId: id
+        };
+        setTransactions(prev => [...prev, transactionPayload]);
+      }
+
+      return updatedOS;
+    }
 
     // Auto-create transaction in Cashier (Caixa/PDV) if transitioned to paid
     const isTransitioningToPaid = existing && existing.paymentStatus !== 'pago' && updatedFields.paymentStatus === 'pago';
@@ -856,33 +966,204 @@ export default function App() {
   };
 
   const handleDeleteOS = async (id: string) => {
-    if (!checkAuth('Para deletar ordens de serviço reais, conecte sua conta do Google.')) return;
+    if (!user) {
+      setAuthModalMessage('Para deletar ordens de serviço reais, conecte sua conta do Google.');
+      setShowAuthModal(true);
+      setServiceOrders(prev => prev.filter(o => o.id !== id));
+      return;
+    }
     await deleteDoc(doc(db, 'service_orders', id));
   };
 
   // CRUD Customer Operations
   const handleAddCustomer = async (item: Omit<Customer, 'id' | 'createdAt' | 'updatedAt'>) => {
-    if (!checkAuth('Para cadastrar novos clientes no banco de dados real, conecte sua conta do Google.')) return;
     const customerPayload = {
       ...item,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
-    await addDoc(collection(db, 'customers'), cleanPayload({ ...customerPayload, ownerId: user.uid }));
+    
+    // Always update local state immediately (optimistic)
+    const tempId = `local-${Date.now()}`;
+    const newCust = { ...customerPayload, id: tempId } as Customer;
+    setCustomers(prev => [...prev, newCust]);
+
+    if (!user) {
+      setAuthModalMessage('Para cadastrar novos clientes no banco de dados real, conecte sua conta do Google.');
+      setShowAuthModal(true);
+      return;
+    }
+    
+    try {
+      const docRef = await addDoc(collection(db, 'customers'), cleanPayload({ ...customerPayload, ownerId: user.uid }));
+      // Replace temp ID with actual Firestore ID once written
+      setCustomers(prev => prev.map(c => c.id === tempId ? { ...c, id: docRef.id } : c));
+    } catch (err) {
+      console.error('Erro ao cadastrar cliente:', err);
+    }
   };
 
   const handleEditCustomer = async (id: string, updatedFields: Partial<Customer>) => {
-    if (!checkAuth('Para editar detalhes de clientes no banco de dados real, conecte sua conta do Google.')) return;
+    const now = new Date().toISOString();
+    
+    // Always update local state immediately (optimistic)
+    setCustomers(prev => prev.map(c => c.id === id ? { ...c, ...updatedFields, updatedAt: now } : c));
+
+    if (!user) {
+      setAuthModalMessage('Para editar detalhes de clientes no banco de dados real, conecte sua conta do Google.');
+      setShowAuthModal(true);
+      return;
+    }
     const updated = {
       ...updatedFields,
-      updatedAt: new Date().toISOString()
+      updatedAt: now
     };
-    await updateDoc(doc(db, 'customers', id), cleanPayload(updated));
+    try {
+      await updateDoc(doc(db, 'customers', id), cleanPayload(updated));
+    } catch (err) {
+      console.error('Erro ao editar cliente:', err);
+    }
   };
 
   const handleDeleteCustomer = async (id: string) => {
-    if (!checkAuth('Para excluir clientes do banco de dados real, conecte sua conta do Google.')) return;
-    await deleteDoc(doc(db, 'customers', id));
+    // Always update local state immediately (optimistic)
+    setCustomers(prev => prev.filter(c => c.id !== id));
+
+    if (!user) {
+      setAuthModalMessage('Para excluir clientes do banco de dados real, conecte sua conta do Google.');
+      setShowAuthModal(true);
+      return;
+    }
+    try {
+      await deleteDoc(doc(db, 'customers', id));
+    } catch (err) {
+      console.error('Erro ao excluir cliente:', err);
+    }
+  };
+
+  // CRUD Parts Orders Operations
+  const handleAddPartOrder = async (item: Omit<CustomerPartOrder, 'id' | 'orderNumber' | 'createdAt' | 'updatedAt'>): Promise<CustomerPartOrder | null> => {
+    // Generate orderNumber
+    let maxNum = 1000;
+    partsOrders.forEach((o) => {
+      const match = o.orderNumber?.match(/^EP-(\d+)$/);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (num > maxNum) maxNum = num;
+      }
+    });
+    const orderNumber = `EP-${maxNum + 1}`;
+    
+    const now = new Date().toISOString();
+    const payload = {
+      ...item,
+      orderNumber,
+      createdAt: now,
+      updatedAt: now
+    };
+
+    if (!user) {
+      setAuthModalMessage('Para registrar encomendas reais no banco de dados, conecte sua conta do Google.');
+      setShowAuthModal(true);
+      const localId = `local-${Date.now()}`;
+      const newOrder = { ...payload, id: localId } as CustomerPartOrder;
+      setPartsOrders(prev => [...prev, newOrder]);
+
+      // If paymentType is 'pago_antecipado', automatically create a cash register transaction entry
+      if (item.paymentType === 'pago_antecipado') {
+        const transactionPayload = {
+          id: `local-tx-${Date.now()}`,
+          description: `encomenda nº ${orderNumber}`,
+          amount: item.clientPrice,
+          type: 'entrada',
+          category: 'Encomenda',
+          paymentMethod: item.paymentMethod || 'pix',
+          date: now,
+          cost: item.costPrice || 0
+        };
+        setTransactions(prev => [...prev, transactionPayload]);
+      }
+
+      return newOrder;
+    }
+
+    try {
+      const docRef = await addDoc(collection(db, 'parts_orders'), cleanPayload({ ...payload, ownerId: user.uid }));
+      const newOrder = { ...payload, id: docRef.id } as CustomerPartOrder;
+      
+      // Update state locally immediately (optimistic)
+      setPartsOrders(prev => {
+        if (prev.some(o => o.id === newOrder.id)) return prev;
+        return [...prev, newOrder];
+      });
+      
+      // If paymentType is 'pago_antecipado', automatically create a cash register transaction entry
+      if (item.paymentType === 'pago_antecipado') {
+        const transactionPayload = {
+          description: `encomenda nº ${orderNumber}`,
+          amount: item.clientPrice,
+          type: 'entrada',
+          category: 'Encomenda',
+          paymentMethod: item.paymentMethod || 'pix',
+          date: now,
+          cost: item.costPrice || 0,
+          ownerId: user.uid
+        };
+        const txDoc = await addDoc(collection(db, 'transactions'), cleanPayload(transactionPayload));
+        
+        // Optimistically update transactions
+        setTransactions(prev => {
+          if (prev.some(t => t.id === txDoc.id)) return prev;
+          return [...prev, { ...transactionPayload, id: txDoc.id } as Transaction];
+        });
+      }
+
+      return newOrder;
+    } catch (err) {
+      console.error('Erro ao adicionar encomenda:', err);
+      handleFirestoreError(err, 'write', 'parts_orders');
+      return null;
+    }
+  };
+
+  const handleEditPartOrder = async (id: string, updatedFields: Partial<CustomerPartOrder>) => {
+    const now = new Date().toISOString();
+    
+    // Always update local state immediately (optimistic)
+    setPartsOrders(prev => prev.map(o => o.id === id ? { ...o, ...updatedFields, updatedAt: now } : o));
+
+    if (!user) {
+      setAuthModalMessage('Para editar detalhes de encomendas, conecte sua conta do Google.');
+      setShowAuthModal(true);
+      return;
+    }
+    const updated = {
+      ...updatedFields,
+      updatedAt: now
+    };
+    try {
+      await updateDoc(doc(db, 'parts_orders', id), cleanPayload(updated));
+    } catch (err) {
+      console.error('Erro ao editar encomenda:', err);
+      handleFirestoreError(err, 'write', 'parts_orders');
+    }
+  };
+
+  const handleDeletePartOrder = async (id: string) => {
+    // Always update local state immediately (optimistic)
+    setPartsOrders(prev => prev.filter(o => o.id !== id));
+
+    if (!user) {
+      setAuthModalMessage('Para excluir encomendas do banco de dados real, conecte sua conta do Google.');
+      setShowAuthModal(true);
+      return;
+    }
+    try {
+      await deleteDoc(doc(db, 'parts_orders', id));
+    } catch (err) {
+      console.error('Erro ao excluir encomenda:', err);
+      handleFirestoreError(err, 'write', 'parts_orders');
+    }
   };
 
   // CRUD Equipment Purchase Operations
@@ -1046,6 +1327,24 @@ export default function App() {
       case 'compras': return <Computer size={size} />;
       case 'agendamentos': return <Calendar size={size} />;
       case 'backup': return <Cloud size={size} />;
+      case 'encomendas': return (
+        <div className="relative">
+          <ClipboardList size={size} />
+          {partsOrders.some(o => {
+            if (o.status === 'finalizado') return false;
+            const createdDate = new Date(o.createdAt);
+            const targetDate = new Date(createdDate.getTime() + o.daysToArrive * 24 * 60 * 60 * 1000);
+            const today = new Date();
+            targetDate.setHours(0, 0, 0, 0);
+            today.setHours(0, 0, 0, 0);
+            const diffTime = targetDate.getTime() - today.getTime();
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            return diffDays <= 1;
+          }) && (
+            <span className="absolute -top-1.5 -right-1.5 w-2.5 h-2.5 bg-emerald-500 rounded-full border border-white animate-pulse" />
+          )}
+        </div>
+      );
       case 'settings_shop': return <Settings size={size} />;
       case 'whatsapp': return <MessageCircle size={size} />;
       default: return <Computer size={size} />;
@@ -1062,6 +1361,7 @@ export default function App() {
       case 'clientes': return 'Meus Clientes';
       case 'compras': return 'Compra de Equipamentos';
       case 'agendamentos': return 'Agendamentos';
+      case 'encomendas': return 'Encomenda de Peças';
       case 'backup': return 'Drive & Backup';
       case 'settings_shop': return 'Configurações';
       case 'whatsapp': return 'WhatsApp Web';
@@ -1071,7 +1371,20 @@ export default function App() {
 
   // Ensure current tab is valid or fallback to dashboard
   const validTabs = shopConfig.menuOrder || DEFAULT_CONFIG.menuOrder;
-  const currentMenuOrder = validTabs.includes('whatsapp') ? validTabs : [...validTabs, 'whatsapp'];
+  const rawMenuOrder = validTabs.includes('whatsapp') ? validTabs : [...validTabs, 'whatsapp'];
+  
+  // Dynamically place 'encomendas' above 'settings_shop'
+  const currentMenuOrder = useMemo(() => {
+    const list = [...rawMenuOrder];
+    const filtered = list.filter(m => m !== 'encomendas');
+    const settingsIndex = filtered.indexOf('settings_shop');
+    if (settingsIndex !== -1) {
+      filtered.splice(settingsIndex, 0, 'encomendas');
+    } else {
+      filtered.push('encomendas');
+    }
+    return filtered;
+  }, [rawMenuOrder]);
 
   // Loading indicator on auth initialize
   if (loading) {
@@ -1530,6 +1843,18 @@ export default function App() {
                 backupHistory={backupHistory}
                 onAddBackupLog={handleAddBackupLog}
                 onRestoreData={handleRestoreBackup}
+              />
+            )}
+
+            {currentTab === 'encomendas' && (
+              <PartOrders 
+                partOrders={partsOrders}
+                customers={customers}
+                config={shopConfig}
+                onAddPartOrder={handleAddPartOrder}
+                onEditPartOrder={handleEditPartOrder}
+                onDeletePartOrder={handleDeletePartOrder}
+                onAddCustomer={handleAddCustomer}
               />
             )}
 

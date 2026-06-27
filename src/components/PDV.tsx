@@ -16,7 +16,9 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   Calendar,
-  FileImage
+  FileImage,
+  Lock,
+  Unlock
 } from 'lucide-react';
 import { Product, Staff, Transaction, Customer } from '../types';
 import { formatCurrency, capitalizeFirstLetter } from '../utils';
@@ -104,6 +106,7 @@ export default function PDV({
   const [caixaInputValue, setCaixaInputValue] = useState('');
   const [hasSangria, setHasSangria] = useState(false);
   const [sangriaValue, setSangriaValue] = useState('');
+  const [usePhysicalCount, setUsePhysicalCount] = useState(false);
 
   // Cash Count States
   const [cashCount, setCashCount] = useState<Record<string, number>>(() => {
@@ -157,35 +160,27 @@ export default function PDV({
         });
       }
       
-      const newBalance = currentCashInDrawer - (hasSangria ? sangria : 0);
+      const baseCash = usePhysicalCount ? totalCashCount : currentCashInDrawer;
+      const newBalance = baseCash - (hasSangria ? sangria : 0);
       
       await onAddTransaction({
-        description: `Fechamento de Caixa. Restou no caixa: ${formatCurrency(newBalance)}`,
-        amount: currentCashInDrawer, // Total that was in cash before sangria
+        description: usePhysicalCount 
+          ? `Fechamento de Caixa (Físico: ${formatCurrency(totalCashCount)}). Restou no caixa: ${formatCurrency(newBalance)}`
+          : `Fechamento de Caixa. Restou no caixa: ${formatCurrency(newBalance)}`,
+        amount: baseCash, // Total that was in cash before sangria
         type: 'fechamento_caixa',
         category: 'Fechamento de Caixa',
         paymentMethod: 'dinheiro',
         date: new Date().toISOString()
       });
       
-      // Auto-create tomorrow's opening if they want? "ja sendo adicionado a abertura do caixa do dia seguinte"
-      // Wait, we can just record an 'Abertura' immediately or next day?
-      // Since it says "ja sendo adicionado a abertura", we can auto-open it with the remaining balance
-      await onAddTransaction({
-        description: 'Abertura Automática (Saldo Anterior)',
-        amount: newBalance,
-        type: 'abertura_caixa',
-        category: 'Abertura de Caixa',
-        paymentMethod: 'dinheiro',
-        date: new Date().toISOString()
-      });
-      
-      alert('Caixa fechado com sucesso e saldo transferido para o próximo período!');
+      alert('Caixa fechado com sucesso!');
     }
     setIsCaixaModalOpen(false);
     setCaixaInputValue('');
     setHasSangria(false);
     setSangriaValue('');
+    setUsePhysicalCount(false); // Reset selection
   };
 
   const handleChangeModalSubmit = () => {
@@ -276,9 +271,14 @@ export default function PDV({
   
   const isCaixaOpen = lastAbertura && (!lastFechamento || new Date(lastAbertura.date) > new Date(lastFechamento.date));
   
+  const sessionTxs = lastAbertura ? transactions.filter(t => new Date(t.date) >= new Date(lastAbertura.date)) : [];
+  const sessionTotalEntradas = sessionTxs.filter(t => t.type === 'entrada').reduce((sum, t) => sum + t.amount, 0);
+  const sessionTotalPix = sessionTxs.filter(t => t.type === 'entrada' && t.paymentMethod === 'pix').reduce((sum, t) => sum + t.amount, 0);
+  const sessionTotalCredito = sessionTxs.filter(t => t.type === 'entrada' && t.paymentMethod === 'credito').reduce((sum, t) => sum + t.amount, 0);
+  const sessionTotalDebito = sessionTxs.filter(t => t.type === 'entrada' && t.paymentMethod === 'debito').reduce((sum, t) => sum + t.amount, 0);
+
   let currentCashInDrawer = 0;
   if (isCaixaOpen && lastAbertura) {
-    const sessionTxs = transactions.filter(t => new Date(t.date) >= new Date(lastAbertura.date));
     const openingAmount = sessionTxs.find(t => t.id === lastAbertura.id)?.amount || 0;
     
     const cashSales = sessionTxs.filter(t => t.type === 'entrada' && t.paymentMethod === 'dinheiro').reduce((sum, t) => sum + t.amount, 0);
@@ -327,6 +327,12 @@ export default function PDV({
     }
     setQuery('');
     setSuggestions([]);
+  };
+
+  const updateCartItemPrice = (pId: string, newPrice: number) => {
+    setCart(cart.map(item => 
+      item.product.id === pId ? { ...item, product: { ...item.product, price: newPrice } } : item
+    ));
   };
 
   const removeFromCart = (pId: string) => {
@@ -786,20 +792,21 @@ export default function PDV({
       
       const totais = [
         { label: 'Entradas', value: todayTransactions.filter(t => t.type === 'entrada' || t.type === 'abertura_caixa').reduce((s, t) => s + t.amount, 0) },
-        { label: 'Saídas', value: todayTransactions.filter(t => t.type === 'saida').reduce((s, t) => s + t.amount, 0) },
+        { label: 'Saídas', value: todayTransactions.filter(t => t.type === 'saida' && t.category !== 'Sangria').reduce((s, t) => s + t.amount, 0) },
+        { label: 'Sangria', value: todayTransactions.filter(t => t.category === 'Sangria').reduce((s, t) => s + t.amount, 0) },
         { label: 'Saldo Final', value: currentCashInDrawer }
       ];
 
       totais.forEach((t, i) => {
         doc.setFillColor(250, 250, 250);
-        doc.roundedRect(15 + (i * 60), y, 55, 15, 2, 2, 'F');
+        doc.roundedRect(15 + (i * 46), y, 42, 15, 2, 2, 'F');
         doc.setFont('Helvetica', 'bold');
         doc.setFontSize(8);
         doc.setTextColor(100, 100, 100);
-        doc.text(t.label.toUpperCase(), 20 + (i * 60), y + 6);
+        doc.text(t.label.toUpperCase(), 18 + (i * 46), y + 6);
         doc.setFontSize(10);
         doc.setTextColor(30, 30, 30);
-        doc.text(formatCurrency(t.value), 20 + (i * 60), y + 12);
+        doc.text(formatCurrency(t.value), 18 + (i * 46), y + 12);
       });
 
       y += 22;
@@ -894,25 +901,32 @@ export default function PDV({
       ctx.fillRect(30, cy, canvas.width - 60, 80);
       
       const entradas = todayTransactions.filter(t => t.type === 'entrada' || t.type === 'abertura_caixa').reduce((s, t) => s + t.amount, 0);
-      const saidas = todayTransactions.filter(t => t.type === 'saida').reduce((s, t) => s + t.amount, 0);
+      const saidas = todayTransactions.filter(t => t.type === 'saida' && t.category !== 'Sangria').reduce((s, t) => s + t.amount, 0);
+      const sangriaVal = todayTransactions.filter(t => t.category === 'Sangria').reduce((s, t) => s + t.amount, 0);
 
       ctx.fillStyle = '#10b981';
-      ctx.font = 'bold 16px Arial';
+      ctx.font = 'bold 14px Arial';
       ctx.fillText('ENTRADAS', 50, cy + 30);
-      ctx.font = 'bold 24px Arial';
+      ctx.font = 'bold 20px Arial';
       ctx.fillText(formatCurrency(entradas), 50, cy + 60);
 
       ctx.fillStyle = '#ef4444';
-      ctx.font = 'bold 16px Arial';
-      ctx.fillText('SAÍDAS', 250, cy + 30);
-      ctx.font = 'bold 24px Arial';
-      ctx.fillText(formatCurrency(saidas), 250, cy + 60);
+      ctx.font = 'bold 14px Arial';
+      ctx.fillText('SAÍDAS', 230, cy + 30);
+      ctx.font = 'bold 20px Arial';
+      ctx.fillText(formatCurrency(saidas), 230, cy + 60);
+
+      ctx.fillStyle = '#71717a';
+      ctx.font = 'bold 14px Arial';
+      ctx.fillText('SANGRIA', 410, cy + 30);
+      ctx.font = 'bold 20px Arial';
+      ctx.fillText(formatCurrency(sangriaVal), 410, cy + 60);
 
       ctx.fillStyle = '#18181b';
-      ctx.font = 'bold 16px Arial';
-      ctx.fillText('SALDO DO DIA', 450, cy + 30);
-      ctx.font = 'bold 24px Arial';
-      ctx.fillText(formatCurrency(currentCashInDrawer), 450, cy + 60);
+      ctx.font = 'bold 14px Arial';
+      ctx.fillText('SALDO DO DIA', 590, cy + 30);
+      ctx.font = 'bold 20px Arial';
+      ctx.fillText(formatCurrency(currentCashInDrawer), 590, cy + 60);
 
       cy += 110;
       ctx.fillStyle = '#18181b';
@@ -969,16 +983,14 @@ export default function PDV({
         <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
           <div className="flex items-center gap-3">
             <div>
-              <h2 className="text-xl font-bold text-zinc-950 font-sans">Terminal de Vendas / PDV</h2>
+              <h2 className="text-xl font-bold text-zinc-950 font-sans flex flex-wrap items-center gap-2">
+                <span>Terminal de Vendas / PDV</span>
+                <span className="text-xs font-semibold px-2 py-0.5 bg-zinc-100 text-zinc-600 rounded-lg shadow-2xs">
+                  {new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}
+                </span>
+              </h2>
               <p className="text-xs text-zinc-400">Lance vendas rápidas ou registre saídas do caixa.</p>
             </div>
-            <button
-              onClick={() => setIsContagemOpen(true)}
-              className="ml-2 flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 rounded-lg text-[10px] font-bold transition-colors"
-              title="Acessar Contagem de Dinheiro"
-            >
-              <span>Contagem</span>
-            </button>
           </div>
           <div className="flex flex-col items-end gap-2">
             <div className="flex bg-zinc-100 p-1 rounded-xl">
@@ -996,16 +1008,32 @@ export default function PDV({
               </button>
             </div>
             
-            <div className="flex gap-2">
-              <span className={`text-[10px] font-bold px-2 py-1 rounded flex items-center ${isCaixaOpen ? 'bg-green-100 text-green-700' : 'bg-zinc-100 text-zinc-500'}`}>
-                {isCaixaOpen ? `Caixa Aberto: ${formatCurrency(currentCashInDrawer)}` : 'Caixa Fechado'}
+            <div className="flex items-center gap-2">
+              <span className={`text-sm font-extrabold px-3 py-1.5 rounded-xl flex items-center gap-1.5 border shadow-2xs ${
+                isCaixaOpen 
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                  : 'bg-rose-50 text-rose-700 border-rose-200'
+              }`}>
+                {isCaixaOpen ? (
+                  <>
+                    <Unlock size={14} className="text-emerald-600 shrink-0" />
+                    <span>Caixa Aberto: {formatCurrency(currentCashInDrawer)}</span>
+                  </>
+                ) : (
+                  <>
+                    <Lock size={14} className="text-rose-600 shrink-0" />
+                    <span>Caixa Fechado</span>
+                  </>
+                )}
               </span>
               <button
                 onClick={() => {
                   setCaixaModalType(isCaixaOpen ? 'fechar' : 'abrir');
                   setIsCaixaModalOpen(true);
                 }}
-                className={`px-3 py-1 rounded text-[10px] font-bold cursor-pointer transition-colors ${isCaixaOpen ? 'bg-rose-50 text-rose-600 hover:bg-rose-100' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'}`}
+                className={`px-3 py-2 rounded-xl text-[11px] font-bold cursor-pointer transition-colors ${
+                  isCaixaOpen ? 'bg-rose-50 text-rose-600 hover:bg-rose-100' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
+                }`}
               >
                 {isCaixaOpen ? 'Fechar Caixa' : 'Abrir Caixa'}
               </button>
@@ -1165,44 +1193,90 @@ export default function PDV({
             </div>
           ) : (
             <div className="divide-y divide-zinc-100 max-h-[350px] overflow-y-auto pr-1">
-              {cart.map(item => (
-                <div key={item.product.id} className="py-3 flex justify-between items-center bg-white">
-                  <div className="space-y-0.5 max-w-[60%]">
-                    <p className="text-xs font-bold text-zinc-800 truncate">{item.product.name}</p>
-                    <p className="text-[10px] text-zinc-400">Preço unitário: {formatCurrency(item.product.price)}</p>
-                  </div>
-
-                  <div className="flex items-center gap-4">
-                    {/* Quantity Selector */}
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => updateCartQty(item.product.id, item.qty - 1)}
-                        className="w-6 h-6 rounded border border-zinc-200 flex items-center justify-center text-xs text-zinc-500 hover:bg-zinc-50 transition-colors"
-                      >
-                        -
-                      </button>
-                      <span className="w-8 text-center text-xs font-bold text-zinc-800">{item.qty}</span>
-                      <button
-                        onClick={() => updateCartQty(item.product.id, item.qty + 1)}
-                        className="w-6 h-6 rounded border border-zinc-200 flex items-center justify-center text-xs text-zinc-500 hover:bg-zinc-50 transition-colors"
-                      >
-                        +
-                      </button>
+              {cart.map(item => {
+                const originalProduct = products.find(p => p.id === item.product.id);
+                const originalPrice = originalProduct ? originalProduct.price : null;
+                
+                return (
+                  <div key={item.product.id} className="py-3 flex justify-between items-center bg-white border-b border-zinc-50 last:border-b-0">
+                    <div className="space-y-1 max-w-[55%]">
+                      <p className="text-xs font-bold text-zinc-800 truncate" title={item.product.name}>
+                        {item.product.name}
+                      </p>
+                      
+                      <div className="flex flex-col gap-1.5">
+                        {originalPrice !== null && originalPrice !== item.product.price ? (
+                          <div className="flex items-center gap-1.5 text-[10px]">
+                            <span className="text-zinc-400 line-through">
+                              {formatCurrency(originalPrice)}
+                            </span>
+                            <span className="text-emerald-600 font-bold bg-emerald-50 px-1.5 py-0.5 rounded text-[9px]">
+                              Promocional
+                            </span>
+                          </div>
+                        ) : (
+                          originalPrice !== null && (
+                            <p className="text-[10px] text-zinc-400">
+                              Preço original: {formatCurrency(originalPrice)}
+                            </p>
+                          )
+                        )}
+                        
+                        {/* Promo / Discount change option */}
+                        <div className="flex items-center gap-1 text-[10px]">
+                          <span className="text-emerald-700 font-bold bg-emerald-50 border border-emerald-100 px-1 py-0.5 rounded text-[8px]">
+                            Promoção:
+                          </span>
+                          <div className="relative rounded shadow-2xs flex items-center">
+                            <span className="absolute inset-y-0 left-0 pl-1.5 flex items-center text-emerald-600 text-[8px] font-bold">R$</span>
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={item.product.price === 0 ? '' : item.product.price}
+                              onChange={(e) => {
+                                const val = parseFloat(e.target.value) || 0;
+                                updateCartItemPrice(item.product.id, val);
+                              }}
+                              className="w-16 pl-5 pr-1 py-0.5 bg-emerald-50/50 text-emerald-800 border border-emerald-200 rounded text-[9px] font-black focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                              placeholder="0.00"
+                            />
+                          </div>
+                        </div>
+                      </div>
                     </div>
 
-                    <span className="text-xs font-bold text-zinc-950 w-20 text-right">
-                      {formatCurrency(item.product.price * item.qty)}
-                    </span>
+                    <div className="flex items-center gap-4">
+                      {/* Quantity Selector */}
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => updateCartQty(item.product.id, item.qty - 1)}
+                          className="w-6 h-6 rounded border border-zinc-200 flex items-center justify-center text-xs text-zinc-500 hover:bg-zinc-50 transition-colors cursor-pointer"
+                        >
+                          -
+                        </button>
+                        <span className="w-8 text-center text-xs font-bold text-zinc-800">{item.qty}</span>
+                        <button
+                          onClick={() => updateCartQty(item.product.id, item.qty + 1)}
+                          className="w-6 h-6 rounded border border-zinc-200 flex items-center justify-center text-xs text-zinc-500 hover:bg-zinc-50 transition-colors cursor-pointer"
+                        >
+                          +
+                        </button>
+                      </div>
 
-                    <button
-                      onClick={() => removeFromCart(item.product.id)}
-                      className="p-1 hover:bg-rose-50 text-zinc-400 hover:text-rose-600 rounded transition-colors"
-                    >
-                      <Trash2 size={14} />
-                    </button>
+                      <span className="text-xs font-bold text-zinc-950 w-20 text-right">
+                        {formatCurrency(item.product.price * item.qty)}
+                      </span>
+
+                      <button
+                        onClick={() => removeFromCart(item.product.id)}
+                        className="p-1 hover:bg-rose-50 text-zinc-400 hover:text-rose-600 rounded transition-colors cursor-pointer"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -1358,7 +1432,7 @@ export default function PDV({
             <div className="bg-rose-50/50 border border-rose-100 p-2 rounded-xl">
               <span className="text-[9px] font-bold text-rose-600 block uppercase">Saídas (Hoje)</span>
               <span className="text-xs font-extrabold text-rose-700">
-                {formatCurrency(todayTransactions.filter(t => t.type === 'saida').reduce((sum, t) => sum + t.amount, 0))}
+                {formatCurrency(todayTransactions.filter(t => t.type === 'saida' && t.category !== 'Sangria').reduce((sum, t) => sum + t.amount, 0))}
               </span>
             </div>
             <div className="bg-zinc-50 border border-zinc-150 p-2 rounded-xl">
@@ -1366,7 +1440,7 @@ export default function PDV({
               <span className="text-xs font-black text-zinc-850">
                 {formatCurrency(
                   todayTransactions.filter(t => t.type === 'entrada' || t.type === 'abertura_caixa').reduce((sum, t) => sum + t.amount, 0) -
-                  todayTransactions.filter(t => t.type === 'saida').reduce((sum, t) => sum + t.amount, 0)
+                  todayTransactions.filter(t => t.type === 'saida' && t.category !== 'Sangria').reduce((sum, t) => sum + t.amount, 0)
                 )}
               </span>
             </div>
@@ -1379,14 +1453,19 @@ export default function PDV({
             ) : (
               todayTransactions.slice(0, 15).map((t) => {
                 const isPDVSale = t.description.toLowerCase().includes('venda pdv');
+                const isSangria = t.category === 'Sangria';
                 return (
                   <div key={t.id} className="p-2.5 border border-zinc-100 rounded-xl hover:bg-zinc-50/50 transition-colors flex justify-between items-center gap-2 group">
                     <div className="space-y-0.5 min-w-0 flex-1">
                       <div className="flex items-center gap-1.5">
                         <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded-md ${
-                          t.type === 'entrada' || t.type === 'abertura_caixa' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+                          isSangria 
+                            ? 'bg-zinc-100 text-zinc-650'
+                            : t.type === 'entrada' || t.type === 'abertura_caixa' 
+                              ? 'bg-emerald-100 text-emerald-800' 
+                              : 'bg-rose-100 text-rose-800'
                         }`}>
-                          {t.type === 'entrada' ? 'Entrada' : t.type === 'abertura_caixa' ? 'Abertura' : t.type === 'fechamento_caixa' ? 'Fechamento' : 'Saída'}
+                          {isSangria ? 'Sangria' : t.type === 'entrada' ? 'Entrada' : t.type === 'abertura_caixa' ? 'Abertura' : t.type === 'fechamento_caixa' ? 'Fechamento' : 'Saída'}
                         </span>
                         {isPDVSale && (
                           <span className="text-[8px] bg-blue-100 text-blue-800 font-extrabold px-1 rounded uppercase tracking-wide">
@@ -1416,11 +1495,18 @@ export default function PDV({
                     </div>
                     
                     <div className="flex items-center gap-2 shrink-0">
-                      <span className={`text-xs font-bold ${
-                        t.type === 'entrada' || t.type === 'abertura_caixa' ? 'text-emerald-600' : 'text-rose-600'
-                      }`}>
-                        {t.type === 'entrada' || t.type === 'abertura_caixa' ? '+' : '-'}{formatCurrency(t.amount)}
-                      </span>
+                      {isSangria ? (
+                        <span className="text-xs font-extrabold text-zinc-400 flex items-center gap-1">
+                          <Lock size={10} className="text-zinc-400" />
+                          {formatCurrency(t.amount)}
+                        </span>
+                      ) : (
+                        <span className={`text-xs font-bold ${
+                          t.type === 'entrada' || t.type === 'abertura_caixa' ? 'text-emerald-600' : 'text-rose-600'
+                        }`}>
+                          {t.type === 'entrada' || t.type === 'abertura_caixa' ? '+' : '-'}{formatCurrency(t.amount)}
+                        </span>
+                      )}
                       
                       <div className="flex items-center gap-1 border-l border-zinc-200 pl-1.5 ml-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
@@ -2001,7 +2087,7 @@ export default function PDV({
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white w-full max-w-sm rounded-2xl border border-zinc-100 shadow-xl overflow-hidden p-6 space-y-4"
+              className={`bg-white w-full ${caixaModalType === 'abrir' ? 'max-w-sm' : 'max-w-md'} rounded-2xl border border-zinc-100 shadow-xl overflow-hidden p-6 space-y-4`}
             >
               <div className="flex justify-between items-center pb-2 border-b border-zinc-100">
                 <h3 className="text-sm font-bold text-zinc-950 font-sans tracking-tight">
@@ -2050,17 +2136,83 @@ export default function PDV({
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    <div className="bg-zinc-50 border border-zinc-150 p-4 rounded-xl text-center space-y-1">
-                      <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Saldo Atual Estimado (Dinheiro Físico)</span>
-                      <p className="text-xl font-black text-zinc-900">{formatCurrency(currentCashInDrawer)}</p>
-                      <p className="text-[9px] text-zinc-500">
-                        {currentCashInDrawer > 0 ? "Este é o valor em espécie que deve estar na gaveta." : "Seu caixa está zerado."}
-                      </p>
+                    {/* Totais do Dia/Sessão */}
+                    <div className="bg-zinc-50 border border-zinc-150 rounded-xl p-4 space-y-3">
+                      <div className="flex justify-between items-center pb-2 border-b border-zinc-200">
+                        <span className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Resumo do Caixa</span>
+                        <span className="text-[10px] font-black text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-lg">
+                          Vendas: {formatCurrency(sessionTotalEntradas)}
+                        </span>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div className="bg-white p-2 rounded-lg border border-zinc-150">
+                          <span className="text-[9px] font-bold text-zinc-400 block uppercase">Dinheiro (Sistema)</span>
+                          <span className="font-extrabold text-zinc-850 block mt-0.5">{formatCurrency(currentCashInDrawer)}</span>
+                        </div>
+                        <div className="bg-white p-2 rounded-lg border border-zinc-150">
+                          <span className="text-[9px] font-bold text-zinc-400 block uppercase">PIX</span>
+                          <span className="font-extrabold text-zinc-850 block mt-0.5">{formatCurrency(sessionTotalPix)}</span>
+                        </div>
+                        <div className="bg-white p-2 rounded-lg border border-zinc-150">
+                          <span className="text-[9px] font-bold text-zinc-400 block uppercase">Cartão Crédito</span>
+                          <span className="font-extrabold text-zinc-850 block mt-0.5">{formatCurrency(sessionTotalCredito)}</span>
+                        </div>
+                        <div className="bg-white p-2 rounded-lg border border-zinc-150">
+                          <span className="text-[9px] font-bold text-zinc-400 block uppercase">Cartão Débito</span>
+                          <span className="font-extrabold text-zinc-850 block mt-0.5">{formatCurrency(sessionTotalDebito)}</span>
+                        </div>
+                      </div>
                     </div>
 
-                    <div className="space-y-2">
+                    {/* Contagem de Dinheiro Físico */}
+                    <div className="border border-emerald-100 bg-emerald-50/40 p-4 rounded-xl space-y-3">
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <h4 className="text-xs font-bold text-emerald-950">Contagem de Dinheiro</h4>
+                          <p className="text-[9px] text-emerald-700">Deseja conferir ou recontar o caixa?</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setIsContagemOpen(true)}
+                          className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[9px] font-black transition-colors flex items-center gap-1 cursor-pointer"
+                        >
+                          Fazer Contagem
+                        </button>
+                      </div>
+
+                      <div className="bg-white/80 p-2.5 rounded-lg border border-emerald-100 flex items-center justify-between text-xs">
+                        <div>
+                          <span className="text-[9px] font-bold text-zinc-500 block uppercase">Dinheiro Contado</span>
+                          <span className="font-extrabold text-emerald-800">{formatCurrency(totalCashCount)}</span>
+                        </div>
+                        {totalCashCount > 0 && (
+                          <div className="text-right">
+                            <span className="text-[9px] font-bold text-zinc-500 block uppercase">Diferença</span>
+                            <span className={`font-black ${totalCashCount === currentCashInDrawer ? 'text-emerald-600' : totalCashCount > currentCashInDrawer ? 'text-blue-600' : 'text-rose-600'}`}>
+                              {totalCashCount === currentCashInDrawer ? 'Sem desvio' : `${totalCashCount > currentCashInDrawer ? '+' : '-'}${formatCurrency(Math.abs(totalCashCount - currentCashInDrawer))}`}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
+                      <label className="flex items-center gap-2 cursor-pointer pt-1">
+                        <input
+                          type="checkbox"
+                          checked={usePhysicalCount}
+                          onChange={(e) => setUsePhysicalCount(e.target.checked)}
+                          className="rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500"
+                        />
+                        <span className="text-[10px] font-bold text-emerald-900 select-none">
+                          Usar contagem física como saldo final (dia seguinte)
+                        </span>
+                      </label>
+                    </div>
+
+                    {/* Sangria */}
+                    <div className="space-y-2 pt-1 border-t border-zinc-100">
                       <label className="flex items-center justify-between cursor-pointer">
-                        <span className="text-xs font-bold text-zinc-600">Realizar Sangria?</span>
+                        <span className="text-xs font-bold text-zinc-650">Realizar Sangria?</span>
                         <input
                           type="checkbox"
                           checked={hasSangria}

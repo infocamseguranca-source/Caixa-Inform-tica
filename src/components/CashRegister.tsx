@@ -13,7 +13,10 @@ import {
   CreditCard,
   X,
   PlusCircle,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Lock,
+  Unlock,
+  Ban
 } from 'lucide-react';
 import { Transaction } from '../types';
 import { formatCurrency, formatDate } from '../utils';
@@ -69,6 +72,7 @@ export default function CashRegister({
   
   const [filterMonth, setFilterMonth] = useState<string>('todos');
   const [filterDay, setFilterDay] = useState<string>('todos');
+  const [activeSubTab, setActiveSubTab] = useState<'geral' | 'sangria'>('geral');
 
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -197,7 +201,11 @@ export default function CashRegister({
     .reduce((acc, curr) => acc + curr.amount, 0);
 
   const filteredOutflow = filteredTransactions
-    .filter(t => t.type === 'saida')
+    .filter(t => t.type === 'saida' && t.category !== 'Sangria')
+    .reduce((acc, curr) => acc + curr.amount, 0);
+
+  const filteredSangria = filteredTransactions
+    .filter(t => t.category === 'Sangria')
     .reduce((acc, curr) => acc + curr.amount, 0);
 
   const filteredBalance = filteredInflow - filteredOutflow;
@@ -230,6 +238,56 @@ export default function CashRegister({
     if (onExportExcel) {
       onExportExcel(filteredTransactions, 'Fluxo_de_Caixa');
     }
+  };
+
+  const MONTH_NAMES = [
+    'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+  ];
+
+  const reportMonthIndex = filterMonth !== 'todos' ? parseInt(filterMonth) : new Date().getMonth();
+  const reportYear = new Date().getFullYear();
+
+  const monthlySangriaList = transactions.filter(t => {
+    const tDate = new Date(t.date);
+    return t.category === 'Sangria' &&
+           tDate.getMonth() === reportMonthIndex &&
+           tDate.getFullYear() === reportYear;
+  }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  const totalMonthlySangriaAmount = monthlySangriaList.reduce((sum, t) => sum + t.amount, 0);
+
+  const daysInReportMonth = new Date(reportYear, reportMonthIndex + 1, 0).getDate();
+  const sangriasByDay: Record<number, Transaction[]> = {};
+  for (let d = 1; d <= daysInReportMonth; d++) {
+    sangriasByDay[d] = [];
+  }
+  monthlySangriaList.forEach(t => {
+    const d = new Date(t.date).getDate();
+    if (sangriasByDay[d]) {
+      sangriasByDay[d].push(t);
+    }
+  });
+
+  const exportSangriaCSV = () => {
+    const headers = ['Data e Hora', 'Descrição', 'Valor Retirado', 'Status'];
+    const rows = monthlySangriaList.map(t => [
+      formatDate(t.date),
+      t.description,
+      t.amount.toString(),
+      'Depósito Bancário'
+    ]);
+
+    const csvContent = "data:text/csv;charset=utf-8,\uFEFF" 
+      + [headers.join(';'), ...rows.map(e => e.join(';'))].join('\n');
+    
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `relatorio_sangria_${MONTH_NAMES[reportMonthIndex].toLowerCase()}_${reportYear}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   return (
@@ -267,44 +325,70 @@ export default function CashRegister({
         </div>
       </div>
 
-      {/* Filter Stats bar */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-zinc-50 p-4 rounded-xl border border-zinc-200/60">
-        <div className="text-center md:text-left border-b md:border-b-0 md:border-r border-zinc-200 pb-3 md:pb-0 md:pr-4">
-          <span className="text-[11px] uppercase tracking-wider font-bold text-zinc-400">Saldo Filtrado</span>
-          <h4 className={`text-xl font-extrabold ${filteredBalance >= 0 ? 'text-zinc-950' : 'text-rose-600'} mt-1`}>
-            {formatCurrency(filteredBalance)}
-          </h4>
-        </div>
-        <div className="text-center md:text-left border-b md:border-b-0 md:border-r border-zinc-200 pb-3 md:pb-0 md:px-4">
-          <span className="text-[11px] uppercase tracking-wider font-bold text-zinc-400">Entradas Filtradas</span>
-          <h4 className="text-xl font-extrabold text-emerald-600 mt-1">
-            + {formatCurrency(filteredInflow)}
-          </h4>
-        </div>
-        <div className="text-center md:text-left md:border-r border-zinc-200 pb-3 md:pb-0 md:px-4">
-          <span className="text-[11px] uppercase tracking-wider font-bold text-zinc-400">Saídas Filtradas</span>
-          <h4 className="text-xl font-extrabold text-rose-600 mt-1">
-            - {formatCurrency(filteredOutflow)}
-          </h4>
-        </div>
-        <div className="md:pl-4 overflow-y-auto max-h-24">
-          <span className="text-[10px] uppercase tracking-wider font-bold text-zinc-400 mb-1.5 block">Dias Abertos (Mês Atual)</span>
-          <div className="flex flex-wrap gap-1.5">
-            {Array.from({ length: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate() }).map((_, i) => {
-              const day = i + 1;
-              const dateStr = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-              const hasMovement = transactions.some(t => t.date.startsWith(dateStr));
-              if (!hasMovement) return null;
-              return (
-                <div key={day} className="flex items-center gap-1 bg-white border border-zinc-200 px-1.5 py-0.5 rounded-md shadow-xs">
-                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>
-                  <span className="text-[9px] font-bold text-zinc-600">{day}/{String(new Date().getMonth() + 1).padStart(2, '0')}</span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+      {/* Submenu Tabs */}
+      <div className="flex border-b border-zinc-200">
+        <button
+          onClick={() => setActiveSubTab('geral')}
+          className={`px-4 py-2 text-sm font-bold border-b-2 transition-all cursor-pointer ${activeSubTab === 'geral' ? 'border-zinc-900 text-zinc-900 font-extrabold' : 'border-transparent text-zinc-400 hover:text-zinc-600'}`}
+        >
+          Lançamentos Gerais
+        </button>
+        <button
+          onClick={() => setActiveSubTab('sangria')}
+          className={`px-4 py-2 text-sm font-bold border-b-2 transition-all cursor-pointer flex items-center gap-1.5 ${activeSubTab === 'sangria' ? 'border-zinc-900 text-zinc-900 font-extrabold' : 'border-transparent text-zinc-400 hover:text-zinc-600'}`}
+        >
+          <Lock size={14} />
+          Relatório de Sangrias do Mês
+        </button>
       </div>
+
+      {activeSubTab === 'geral' ? (
+        <>
+          {/* Filter Stats bar */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4 bg-zinc-50 p-4 rounded-xl border border-zinc-200/60">
+            <div className="text-center md:text-left border-b sm:border-b-0 sm:border-r border-zinc-200 pb-3 sm:pb-0 sm:pr-4">
+              <span className="text-[11px] uppercase tracking-wider font-bold text-zinc-400">Saldo Filtrado</span>
+              <h4 className={`text-xl font-extrabold ${filteredBalance >= 0 ? 'text-zinc-950' : 'text-rose-600'} mt-1`}>
+                {formatCurrency(filteredBalance)}
+              </h4>
+            </div>
+            <div className="text-center md:text-left border-b sm:border-b-0 sm:border-r border-zinc-200 pb-3 sm:pb-0 sm:px-4">
+              <span className="text-[11px] uppercase tracking-wider font-bold text-zinc-400">Entradas Filtradas</span>
+              <h4 className="text-xl font-extrabold text-emerald-600 mt-1">
+                + {formatCurrency(filteredInflow)}
+              </h4>
+            </div>
+            <div className="text-center md:text-left border-b sm:border-b-0 sm:border-r border-zinc-200 pb-3 sm:pb-0 sm:px-4">
+              <span className="text-[11px] uppercase tracking-wider font-bold text-zinc-400">Saídas Filtradas</span>
+              <h4 className="text-xl font-extrabold text-rose-600 mt-1">
+                - {formatCurrency(filteredOutflow)}
+              </h4>
+            </div>
+            <div className="text-center md:text-left border-b sm:border-b-0 sm:border-r border-zinc-200 pb-3 sm:pb-0 sm:px-4">
+              <span className="text-[11px] uppercase tracking-wider font-bold text-zinc-400">Sangria</span>
+              <h4 className="text-xl font-extrabold text-zinc-450 flex items-center justify-center md:justify-start gap-1 mt-1">
+                <Lock size={14} className="text-zinc-400 shrink-0" />
+                <span>{formatCurrency(filteredSangria)}</span>
+              </h4>
+            </div>
+            <div className="sm:pl-4 overflow-y-auto max-h-24">
+              <span className="text-[10px] uppercase tracking-wider font-bold text-zinc-400 mb-1.5 block">Dias Abertos (Mês)</span>
+              <div className="flex flex-wrap gap-1.5">
+                {Array.from({ length: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate() }).map((_, i) => {
+                  const day = i + 1;
+                  const dateStr = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                  const hasMovement = transactions.some(t => t.date.startsWith(dateStr));
+                  if (!hasMovement) return null;
+                  return (
+                    <div key={day} className="flex items-center gap-1 bg-white border border-zinc-200 px-1.5 py-0.5 rounded-md shadow-xs">
+                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>
+                      <span className="text-[9px] font-bold text-zinc-600">{day}/{String(new Date().getMonth() + 1).padStart(2, '0')}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
 
       {/* Filter and Search controls */}
       <div className="bg-white p-5 rounded-2xl border border-zinc-100 space-y-4 overflow-hidden">
@@ -446,22 +530,29 @@ export default function CashRegister({
                     {/* Title & Desc */}
                     <td className="py-4 px-6 flex items-center gap-3">
                       <div className={`p-2 rounded-lg shrink-0 ${
-                        t.type === 'entrada' || t.type === 'abertura_caixa' 
-                          ? 'bg-emerald-50 text-emerald-600' 
-                          : t.type === 'fechamento_caixa' 
-                            ? 'bg-amber-50 text-amber-600'
-                            : 'bg-rose-50 text-rose-600'
+                        t.category === 'Sangria'
+                          ? 'bg-zinc-100 text-zinc-450'
+                          : t.type === 'entrada' || t.type === 'abertura_caixa' 
+                            ? 'bg-emerald-50 text-emerald-600' 
+                            : t.type === 'fechamento_caixa' 
+                              ? 'bg-amber-50 text-amber-600'
+                              : 'bg-rose-50 text-rose-600'
                       }`}>
-                        {(t.type === 'entrada' || t.type === 'abertura_caixa') ? <ArrowUpRight size={18} /> : <ArrowDownRight size={18} />}
+                        {t.category === 'Sangria' ? <Lock size={18} /> : (t.type === 'entrada' || t.type === 'abertura_caixa') ? <ArrowUpRight size={18} /> : <ArrowDownRight size={18} />}
                       </div>
                       <div className="min-w-0">
                         <p className="text-sm font-semibold text-zinc-900 truncate max-w-xs">{t.description}</p>
                         {t.osId && (
-                          <span className="inline-block bg-blue-50 text-blue-600 text-[10px] font-bold px-1.5 py-0.5 rounded mt-0.5">
+                          <span className="inline-block bg-blue-50 text-blue-600 text-[10px] font-bold px-1.5 py-0.5 rounded mt-0.5 animate-pulse">
                             Integrado à OS
                           </span>
                         )}
-                        {(t.type === 'abertura_caixa' || t.type === 'fechamento_caixa') && (
+                        {t.category === 'Sangria' && (
+                          <span className="inline-block bg-zinc-100 text-zinc-500 text-[10px] font-bold px-1.5 py-0.5 rounded mt-0.5">
+                            Sangria (Retirada de Depósito)
+                          </span>
+                        )}
+                        {t.category !== 'Sangria' && (t.type === 'abertura_caixa' || t.type === 'fechamento_caixa') && (
                           <span className="inline-block bg-zinc-100 text-zinc-600 text-[10px] font-bold px-1.5 py-0.5 rounded mt-0.5">
                             Sessão do Caixa
                           </span>
@@ -486,12 +577,19 @@ export default function CashRegister({
 
                     {/* Amount */}
                     <td className="py-4 px-4 text-right">
-                      <span className={`text-sm font-bold ${
-                        (t.type === 'entrada' || t.type === 'abertura_caixa') ? 'text-emerald-600' 
-                        : t.type === 'fechamento_caixa' ? 'text-amber-600' : 'text-rose-600'
-                      }`}>
-                        {(t.type === 'entrada' || t.type === 'abertura_caixa') ? '+' : t.type === 'fechamento_caixa' ? '=' : '-'} {formatCurrency(t.amount)}
-                      </span>
+                      {t.category === 'Sangria' ? (
+                        <span className="text-sm font-extrabold text-zinc-400 flex items-center justify-end gap-1">
+                          <Lock size={12} className="text-zinc-400 shrink-0" />
+                          <span>{formatCurrency(t.amount)}</span>
+                        </span>
+                      ) : (
+                        <span className={`text-sm font-bold ${
+                          (t.type === 'entrada' || t.type === 'abertura_caixa') ? 'text-emerald-600' 
+                          : t.type === 'fechamento_caixa' ? 'text-amber-600' : 'text-rose-600'
+                        }`}>
+                          {(t.type === 'entrada' || t.type === 'abertura_caixa') ? '+' : t.type === 'fechamento_caixa' ? '=' : '-'} {formatCurrency(t.amount)}
+                        </span>
+                      )}
                     </td>
 
                     {/* Actions */}
@@ -520,6 +618,113 @@ export default function CashRegister({
           </table>
         </div>
       </div>
+    </>
+  ) : (
+    /* Relatório de Sangria Mensal */
+    <div className="space-y-6">
+      <div className="bg-zinc-50 border border-zinc-200/60 p-6 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div className="space-y-1">
+          <span className="text-[10px] uppercase tracking-wider font-extrabold text-zinc-400">Filtro de Relatório</span>
+          <h3 className="text-lg font-bold text-zinc-900">
+            Sangrias de {MONTH_NAMES[reportMonthIndex]} / {reportYear}
+          </h3>
+          <p className="text-xs text-zinc-500">
+            Mostrando todos os valores de sangria retirados e depositados neste mês.
+          </p>
+        </div>
+        <div className="flex gap-2 w-full md:w-auto">
+          <button
+            onClick={exportSangriaCSV}
+            disabled={monthlySangriaList.length === 0}
+            className="flex-1 md:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-zinc-200 hover:bg-zinc-50 disabled:opacity-50 text-zinc-700 rounded-xl text-sm font-semibold transition-all cursor-pointer"
+          >
+            <Download size={16} />
+            Exportar Relatório CSV
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="bg-zinc-100/50 p-5 rounded-xl border border-zinc-200/40 flex items-center gap-4">
+          <div className="p-3 rounded-lg bg-zinc-200 text-zinc-600 shrink-0">
+            <Lock size={24} />
+          </div>
+          <div>
+            <span className="text-xs text-zinc-400 font-bold uppercase tracking-wider">Total em Sangrias (Mês)</span>
+            <h4 className="text-2xl font-extrabold text-zinc-700 mt-0.5">
+              {formatCurrency(totalMonthlySangriaAmount)}
+            </h4>
+          </div>
+        </div>
+        <div className="bg-zinc-100/50 p-5 rounded-xl border border-zinc-200/40 flex items-center gap-4">
+          <div className="p-3 rounded-lg bg-zinc-200 text-zinc-600 shrink-0">
+            <Ban size={24} />
+          </div>
+          <div>
+            <span className="text-xs text-zinc-400 font-bold uppercase tracking-wider">Quantidade de Retiradas</span>
+            <h4 className="text-2xl font-extrabold text-zinc-700 mt-0.5">
+              {monthlySangriaList.length} {monthlySangriaList.length === 1 ? 'retirada' : 'retiradas'}
+            </h4>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white border border-zinc-100 rounded-2xl overflow-hidden">
+        <div className="p-4 bg-zinc-50 border-b border-zinc-100 font-bold text-xs text-zinc-500 uppercase tracking-wider">
+          Detalhamento Dia a Dia
+        </div>
+        <div className="divide-y divide-zinc-100 max-h-[500px] overflow-y-auto">
+          {Array.from({ length: daysInReportMonth }).map((_, idx) => {
+            const dayNum = daysInReportMonth - idx; // Show latest days first
+            const daySangrias = sangriasByDay[dayNum] || [];
+            const dayTotal = daySangrias.reduce((sum, s) => sum + s.amount, 0);
+
+            return (
+              <div key={dayNum} className="p-4 hover:bg-zinc-50/50 transition-colors flex flex-col md:flex-row justify-between md:items-center gap-3">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-extrabold text-zinc-900">
+                      Dia {String(dayNum).padStart(2, '0')}/{String(reportMonthIndex + 1).padStart(2, '0')}
+                    </span>
+                    {daySangrias.length > 0 && (
+                      <span className="inline-flex items-center gap-1 text-[10px] bg-zinc-100 text-zinc-500 font-extrabold px-1.5 py-0.5 rounded-full">
+                        <Lock size={10} />
+                        {daySangrias.length} {daySangrias.length === 1 ? 'retirada' : 'retiradas'}
+                      </span>
+                    )}
+                  </div>
+                  {daySangrias.length > 0 ? (
+                    <div className="space-y-1 mt-1.5">
+                      {daySangrias.map(s => (
+                        <div key={s.id} className="text-xs text-zinc-500 flex items-center gap-2">
+                          <span className="font-semibold text-zinc-400">
+                            {new Date(s.date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}:
+                          </span>
+                          <span>{s.description}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-zinc-400 font-medium">Nenhuma sangria realizada neste dia.</p>
+                  )}
+                </div>
+                <div className="text-right">
+                  {dayTotal > 0 ? (
+                    <span className="text-sm font-extrabold text-zinc-400 flex items-center md:justify-end gap-1.5 bg-zinc-100 px-3 py-1.5 rounded-xl border border-zinc-200/50 w-fit">
+                      <Lock size={12} className="text-zinc-400 shrink-0" />
+                      <span>{formatCurrency(dayTotal)}</span>
+                    </span>
+                  ) : (
+                    <span className="text-xs text-zinc-350 font-semibold">-</span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  )}
 
       {/* Transaction Entry/Edit Modal */}
       <AnimatePresence>
